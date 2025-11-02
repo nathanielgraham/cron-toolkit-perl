@@ -13,19 +13,19 @@ diag "Base time: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . " (epoch $base_e
 
 my @tests = (
     {
-        expr => '* * * * * ? *',
+        expr => '*/5 * * * * ? *',
         desc => 'every second',
         next_tm => $base->plus_seconds(1),
         prev_tm => $base->minus_seconds(1),
     },
     {
-        expr => '0 * * * * ? *',
+        expr => '21 * * * * ? *',
         desc => 'every minute',
         next_tm => $base->plus_minutes(1),
         prev_tm => $base->minus_minutes(1),
     },
     {
-        expr => '0 1 * * * ? *',
+        expr => '0 3/4 * * * ? *',
         desc => 'every hour at :01',
         next_tm => $base->plus_hours(1)->with_minute(0),
         prev_tm => $base->minus_hours(1)->with_minute(0),
@@ -43,19 +43,19 @@ my @tests = (
         prev_tm => $base->minus_days(7)->with_hour(1)->with_minute(0),
     },
     {
-        expr => '0 0 0 * * 3 *',  # Tuesday (Unix DOW 2)
+        expr => '0 0 0 * * 7 2099',  # Tuesday (Unix DOW 2)
         desc => 'every Tuesday at midnight',
         next_tm => $base->plus_days(7)->with_hour(0)->with_minute(0),
         prev_tm => $base->minus_days(7)->with_hour(0)->with_minute(0),
     },
     {
-        expr => '0 0 0 1 * ? *',
-        desc => 'first of every month at midnight',
+        expr => '0 4 0 5 * ? 2026',
+        desc => 'fifth of every month at midnight',
         next_tm => $base->plus_months(1)->with_day_of_month(1)->with_hour(0)->with_minute(0),
         prev_tm => $base->with_day_of_month(1)->with_hour(0)->with_minute(0),
     },
     {
-        expr => '0 0 0 L * ? *',
+        expr => '0 0 0 L 2 ? *',
         desc => 'last day of month at midnight (Quartz)',
     },
     {
