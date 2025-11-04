@@ -13,5 +13,6 @@ for my $test (@valid_desc) {
    my $cron = Cron::Toolkit->new( expression => $test->{expr} );
    if ( $test->{tz} ) { $cron->time_zone( $test->{tz} ); }
    print $cron->as_string . "\n";
+   print $cron->dump_tree . "\n";
    print $cron->describe . "\n\n";
 }

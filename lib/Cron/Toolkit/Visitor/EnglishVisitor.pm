@@ -57,54 +57,92 @@ sub _fuse {
 # ————————————————————
 
 sub _render_data {
-   my ($self, $node, $field) = @_;
-   return undef unless $node;
+    my ($self, $node, $field) = @_;
+    return undef unless $node;
+    my $type = $node->{type};
 
-   my $type = $node->{type};
+    # --- SINGLE ---
+    if ($type eq 'single') {
+        my $v = $node->{value};
+        return undef if $v == 0 && $field =~ /^(second|minute|hour)$/;
+        return { field => $field, value => $v, kind => 'value' };
+    }
 
-   if ($type eq 'single') {
-      my $v = $node->{value};
-      return undef if $v == 0 && $field =~ /^(second|minute|hour)$/;
+    # --- WILDCARD ---
+    if ($type eq 'wildcard') {
+        return { field => $field, value => "every $field", kind => 'context' }
+            if $field =~ /^(minute|hour)$/;
+        return undef;
+    }
 
-      return { field => $field, value => $v, kind => 'value' };
-   }
+    # --- RANGE ---
+    if ($type eq 'range') {
+        my ($start_node, $end_node) = @{$node->{children}};
+        my $start = $start_node->{value};
+        my $end   = $end_node->{value};
+        return { field => $field, value => [$start, $end], kind => 'range' };
+    }
 
-   if ($type eq 'wildcard') {
-      return { field => $field, value => "every $field", kind => 'context' } if $field =~ /^(minute|hour)$/;
-      return undef;
-   }
+    # --- LIST (supports single, range, step) ---
+    if ($type eq 'list') {
+        my @values;
+        for my $child (@{$node->{children}}) {
+            if ($child->{type} eq 'single') {
+                push @values, $child->{value};
+            }
+            elsif ($child->{type} eq 'range') {
+                my ($s, $e) = map { $_->{value} } @{$child->{children}};
+                push @values, $s, $e if defined $s && defined $e;
+            }
+            elsif ($child->{type} eq 'step') {
+                my ($base, $step_node) = @{$child->{children}};
+                my $step = $step_node->{value};
+                my @step_vals = $self->_expand_step($base, $step, $field);
+                push @values, @step_vals;
+            }
+        }
+        return { field => $field, value => \@values, kind => 'list' };
+    }
 
-   if ($type eq 'range') {
-      my ($s, $e) = map { $_->{value} } @{$node->{children}};
-      return { field => $field, value => [$s, $e], kind => 'range' };
-   }
+    # --- STEP (top-level) ---
+    if ($type eq 'step') {
+        my ($base_node, $step_node) = @{$node->{children}};
+        my $step = $step_node->{value};
+        my @expanded = $self->_expand_step($base_node, $step, $field);
+        return { field => $field, value => \@expanded, kind => 'list' };
+    }
 
-   if ($type eq 'list') {
-      my @values = map { $_->{value} } @{$node->{children}};
-      return { field => $field, value => \@values, kind => 'list' };
-   }
+    return undef;
+}
 
-   if ($type eq 'step') {
-      my $base = $node->{children}[0];
-      my $step = $node->{children}[1]{value};
-      return { field => $field, base => $base, step => $step, kind => 'step' };
-   }
+sub _expand_step {
+    my ($self, $base_node, $step, $field) = @_;
+    my @expanded;
 
-   if ($type eq 'last') {
-      my $offset = $node->{value} =~ /L-(\d+)/ ? $1 : 0;
-      return { field => 'dom', value => $offset, kind => 'last' };
-   }
-   if ($type eq 'lastW') { return { field => 'dom', kind => 'lastW' }; }
-   if ($type eq 'nearest_weekday') {
-      my ($d) = $node->{value} =~ /(\d+)W/;
-      return { field => 'dom', value => $d, kind => 'nearest_weekday' };
-   }
-   if ($type eq 'nth') {
-      my ($dow, $nth) = $node->{value} =~ /(\d+)#(\d+)/;
-      return { field => 'dow', dow => $dow, nth => $nth, kind => 'nth' };
-   }
+    my ($min, $max) = @{ $Cron::Toolkit::Utils::LIMITS{$field} };
 
-   return undef;
+    if ($base_node->{type} eq 'wildcard') {
+        for (my $v = $min; $v <= $max; $v += $step) {
+            push @expanded, $v;
+        }
+    }
+    elsif ($base_node->{type} eq 'single') {
+        my $start = $base_node->{value};
+        $start = $min if $start < $min;
+        for (my $v = $start; $v <= $max; $v += $step) {
+            push @expanded, $v;
+        }
+    }
+    elsif ($base_node->{type} eq 'range') {
+        my ($s, $e) = map { $_->{value} } @{$base_node->{children}};
+        $s = $min if $s < $min;
+        $e = $max if $e > $max;
+        for (my $v = $s; $v <= $e; $v += $step) {
+            push @expanded, $v;
+        }
+    }
+
+    return @expanded;
 }
 
 # ————————————————————
@@ -112,58 +150,123 @@ sub _render_data {
 # ————————————————————
 
 sub _join_time {
-   my ($self, @data) = @_;
-   return "" unless @data;
+    my ($self, @data) = @_;
+    return "" unless @data;
 
-   my ($sec, $min, $hour) = (0, 0, 0);
-   my @context;
-   my @values;
+    my ($sec, $min, $hour) = (0, 0, 0);
+    my @context;
+    my @extra;  # anything NOT second/minute/hour
 
-   for my $d (@data) {
-      if ($d->{kind} eq 'value') {
-         if ($d->{field} eq 'second') { $sec = $d->{value}; }
-         elsif ($d->{field} eq 'minute') { $min = $d->{value}; }
-         elsif ($d->{field} eq 'hour') { $hour = $d->{value}; }
-         else { push @values, $d; }
-      } elsif ($d->{kind} eq 'context') {
-         push @context, $d->{value};
-      } else {
-         push @values, $d;
-      }
-   }
+    # ------------------------------------------------------------------
+    # 1. Extract time fields and context
+    # ------------------------------------------------------------------
+    for my $d (@data) {
+        if ($d->{kind} eq 'value' && $d->{field} =~ /^(second|minute|hour)$/) {
+            $sec   = $d->{value} if $d->{field} eq 'second';
+            $min   = $d->{value} if $d->{field} eq 'minute';
+            $hour  = $d->{value} if $d->{field} eq 'hour';
+        }
+        elsif ($d->{kind} eq 'context') {
+            push @context, $d->{value};
+        }
+        else {
+            push @extra, $d;  # keep for later (step, dom, etc.)
+        }
+    }
 
-   my $time = "";
-   if ($sec || $min || $hour) {
-      $time = format_time($sec, $min, $hour, { omit_seconds_if_zero => 1 });
-   }
+    # ------------------------------------------------------------------
+    # 2. Safe flags
+    # ------------------------------------------------------------------
+    my $has_every_minute = @context ? scalar(grep { /every minute/ } @context) : 0;
+    my $has_every_hour   = @context ? scalar(grep { /every hour/   } @context) : 0;
 
-   my $has_every_minute = grep { /every minute/ } @context;
-   my $has_every_hour   = grep { /every hour/ } @context;
+    my $result = '';
 
-   my $result = "";
+    # ------------------------------------------------------------------
+    # 3. SECOND OFFSET
+    # ------------------------------------------------------------------
+    my $second_part = '';
+    if ($sec && !$has_every_minute) {
+        $second_part = "$sec second" . ($sec == 1 ? '' : 's') . " past every minute";
+    }
 
-   if ($has_every_minute) {
-      $result .= "every minute";
-   } elsif ($has_every_hour) {
-      $result .= "every hour";
-   }
+    # ------------------------------------------------------------------
+    # 4. HOUR RANGES (consume from @data, not @extra)
+    # ------------------------------------------------------------------
+    my @hour_values;
+    my @remaining_data;
 
-   if ($time) {
-      if ($has_every_minute && $has_every_hour) {
-         $result .= " after every hour";
-      } elsif ($has_every_minute) {
-         $result .= " at $time";
-      } else {
-         $result .= " $time";
-      }
-   }
+    for my $d (@data) {
+        if ($d->{kind} eq 'value' && $d->{field} eq 'hour') {
+            push @hour_values, $d->{value};
+        }
+        elsif ($d->{kind} eq 'range' && $d->{field} eq 'hour') {
+            push @hour_values, @{$d->{value}};
+        }
+        else {
+            push @remaining_data, $d;
+        }
+    }
 
-   for my $d (@values) {
-      my $str = $self->_render_value($d);
-      $result .= " $str" if $str;
-   }
+    if (@hour_values) {
+        my @sorted = sort { $a <=> $b } @hour_values;
+        my $i = 0;
+        my @ranges;
+        while ($i < @sorted) {
+            my $start = $sorted[$i];
+            my $end = $start;
+            while ($i + 1 < @sorted && $sorted[$i + 1] == $end + 1) {
+                $i++; $end++;
+            }
+            my $from = format_time(0, 0,  $start, { omit_seconds_if_zero => 1 });
+            my $to   = format_time(0, 59, $end,   { omit_seconds_if_zero => 1 });
+            push @ranges, $start == $end ? $from : "$from to $to";
+            $i++;
+        }
+        $result .= " between " . join(" and ", @ranges);
+    }
 
-   return $result;
+    # ------------------------------------------------------------------
+    # 5. BASE: every minute / every hour
+    # ------------------------------------------------------------------
+    if ($has_every_minute && $has_every_hour) {
+        $result = 'every minute after every hour' . $result;
+    }
+    elsif ($has_every_minute) {
+        $result = 'every minute' . $result;
+    }
+    elsif ($has_every_hour) {
+        $result = 'every hour' . $result;
+    }
+
+    # ------------------------------------------------------------------
+    # 6. CONCRETE TIME (only if not part of range/step)
+    # ------------------------------------------------------------------
+    my $concrete_time = '';
+    if (($sec || $min || $hour) && !$second_part && !@hour_values) {
+        $concrete_time = format_time($sec, $min, $hour, { omit_seconds_if_zero => 1 });
+        $result .= " at $concrete_time";
+    }
+
+    # ------------------------------------------------------------------
+    # 7. Prepend second offset
+    # ------------------------------------------------------------------
+    $result = "$second_part$result" if $second_part && $result;
+
+    # ------------------------------------------------------------------
+    # 8. Append remaining values (dom, dow, step, etc.)
+    # ------------------------------------------------------------------
+    for my $d (@remaining_data) {
+        next if $d->{kind} eq 'context';
+        my $str = $self->_render_value($d);
+        $result .= ", $str" if $str;
+    }
+
+    # Clean leading comma/space
+    $result =~ s/^,\s+//;
+    $result =~ s/^\s+//;
+
+    return $result;
 }
 
 # ————————————————————
