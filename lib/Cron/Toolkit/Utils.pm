@@ -236,6 +236,19 @@ sub join_parts {
 }
 
 sub format_time {
+   my ($sec, $min, $hour, $opts) = @_;
+   $opts //= {};
+
+   my $time = sprintf("%d:%02d:%02d", $hour % 12 || 12, $min, $sec);
+   $time =~ s/:00$// if $opts->{omit_seconds_if_zero} && $sec == 0;
+   $time .= $hour >= 12 ? " PM" : " AM";
+   $time =~ s/^12:/12:/ if $hour < 12;  # 12:30 AM
+   $time =~ s/^0(\d):/ $1:/;  # 09:30 → 9:30
+   return $time;
+}
+
+
+sub format_time2 {
    my ( $s, $m, $h ) = @_;
    $h //= 0;
    $m //= 0;

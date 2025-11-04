@@ -9,7 +9,6 @@ use Time::Moment;
 use Cron::Toolkit::Utils qw(:all);
 use Cron::Toolkit::Pattern::CompositePattern;
 use Cron::Toolkit::Pattern::LeafPattern;
-use Cron::Toolkit::Composer;
 use Cron::Toolkit::Matcher;
 use List::Util qw(max min);
 use Exporter   qw(import);
@@ -146,10 +145,6 @@ sub _new {
       end_epoch   => $self->end_epoch,
    );
 
-   #print Dumper($self->{matcher});
-
-   $self->{composer} = Cron::Toolkit::Composer->new;
-
    return $self;
 }
 
@@ -173,15 +168,69 @@ sub _optimize_node {
    my ($min, $max) = @{ $limits{$field} };
    $min = 0 if $field eq 'dow';
 
+# Step collapse — only if degenerate
+if ($node->{type} eq 'step') {
+    my $base_node = $node->{children}[0];
+    my $step = $node->{children}[1]{value};
+    my @values;
+
+    if ($base_node->{type} eq 'wildcard') {
+        my ($min, $max) = @{ $limits{$field} };
+        $min = 0 if $field eq 'dow';
+        @values = ($min .. $max);
+    } elsif ($base_node->{type} eq 'single') {
+        @values = ($base_node->{value} .. $max);
+    } elsif ($base_node->{type} eq 'range') {
+        my ($start, $end) = map { $_->{value} } @{ $base_node->{children} };
+        @values = ($start .. $end);
+    }
+
+    my @stepped;
+    for (my $v = $values[0]; $v <= $values[-1]; $v += $step) {
+        push @stepped, $v if grep { $_ == $v } @values;
+    }
+
+    # === DEGENERATE CASE: 0 or 1 value → collapse ===
+    if (@stepped == 0) {
+        print STDERR "DEBUG: Step collapse to wildcard: $field\n" if $ENV{Cron_DEBUG};
+        return Cron::Toolkit::Pattern::LeafPattern->new(
+            type => 'wildcard',
+            value => '*',
+            field_type => $field
+        );
+    } elsif (@stepped == 1) {
+        print STDERR "DEBUG: Step collapse to single: $stepped[0] in $field\n" if $ENV{Cron_DEBUG};
+        return Cron::Toolkit::Pattern::LeafPattern->new(
+            type => 'single',
+            value => $stepped[0],
+            field_type => $field
+        );
+    }
+
+    # === NON-DEGENERATE: keep as step (but optimize base if possible) ===
+    # Recursively optimize base (e.g., 1-10/5 → range(1,10))
+    my $optimized_base = $self->_optimize_node($base_node, $field);
+    return $node if $optimized_base == $base_node;  # no change
+
+    my $new_step = Cron::Toolkit::Pattern::CompositePattern->new(
+        type => 'step',
+        field_type => $field
+    );
+    $new_step->add_child($optimized_base);
+    $new_step->add_child($node->{children}[1]);  # step value
+    return $new_step;
+}
    # Step collapse
-   if ($node->{type} eq 'step') {
+   #elsif ($node->{type} eq 'step') {
+   if ($node->{type} eq 'boogo') {
       my $base_node = $node->{children}[0];
       my $step = $node->{children}[1]{value};
       my @values;
       if ($base_node->{type} eq 'wildcard') {
          @values = ($min .. $max);
       } elsif ($base_node->{type} eq 'single') {
-         @values = ($base_node->{value});
+         @values = $base_node->{value};
+         #@values = ($base_node->{value} .. $max);
       } elsif ($base_node->{type} eq 'range') {
          my ($start, $end) = map { $_->{value} } @{ $base_node->{children} };
          @values = ($start .. $end);
@@ -418,7 +467,7 @@ sub _build_node {
          value => $end,
          field_type => $field
       ));
-   } elsif ($value =~ /^(\d*|\*)\/(\d+)$/) {
+   } elsif ($value =~ /^(\*|\d+)\/(\d+)$/) {
       die "Invalid type step for $field: not in allowed types"
          unless grep { $_ eq 'step' } @{ $allowed_types{$field} };
       my ($base_str, $step) = ($1, $2);
@@ -566,7 +615,8 @@ sub env {
 
 sub describe {
    my ($self) = @_;
-   return $self->{composer}->describe( $self->{root} );
+   my $visitor = Cron::Toolkit::Visitor::EnglishVisitor->new();
+   return $self->{root}->traverse($visitor);
 }
 
 sub is_match {

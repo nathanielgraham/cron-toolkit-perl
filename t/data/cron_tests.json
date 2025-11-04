@@ -1,11 +1,11 @@
 [
    {
-      "as_quartz_string" : "0 * * * * ? *",
-      "as_string" : "0 * * * * ? *",
+      "as_quartz_string" : "1 * * * * ? *",
+      "as_string" : "1 * * * * ? *",
       "as_unix_string" : "* * * * *",
       "category" : "general",
       "desc" : "at midnight every day",
-      "expr" : "0 * 1-3,5 */3 * ? *",
+      "expr" : "1 * 1-3,5 */3 * ? *",
       "invalid" : 0,
       "match" : {
          "epoch" : 1761174060,
@@ -46,8 +46,8 @@
       "utc_offset" : 0
    },
    {
-      "as_quartz_string" : "0 * * ? * 1 *",
-      "as_string" : "0 * * ? * 0 *",
+      "as_quartz_string" : "2 * * ? * 1 *",
+      "as_string" : "2 * * ? * 0 *",
       "as_unix_string" : "* * * * 0",
       "category" : "general",
       "desc" : "at midnight Sunday",
@@ -67,12 +67,12 @@
       "utc_offset" : 540
    },
    {
-      "as_quartz_string" : "0 * * ? * 2-6 *",
+      "as_quartz_string" : "4 * * ? * 2-6 *",
       "as_string" : "0 * * ? * 1-5 *",
       "as_unix_string" : "* * * * 1-5",
       "category" : "general",
       "desc" : "at midnight Monday through Friday",
-      "expr" : "* * * * MON-FRI",
+      "expr" : "3 * * * * MON-FRI *",
       "invalid" : 0,
       "match" : {
          "epoch" : 1761174060,
@@ -435,12 +435,12 @@
       "utc_offset" : 660
    },
    {
-      "as_quartz_string" : "0 0 0 * * ? *",
-      "as_string" : "0 0 0 * * ? *",
+      "as_quartz_string" : "3 0 0 * * ? *",
+      "as_string" : "3 0 0 * * ? *",
       "as_unix_string" : "0 0 * * *",
       "category" : "general",
       "desc" : "at midnight every day",
-      "expr" : "0 0 0 * * ? *",
+      "expr" : "3 0 0 * * ? *",
       "invalid" : 0,
       "match" : {
          "epoch" : null,
@@ -482,7 +482,7 @@
       "as_unix_string" : "0 0 * 11 *",
       "category" : "general",
       "desc" : "at midnight November",
-      "expr" : "0 0 0 * 11/3 ? *",
+      "expr" : "1 30 14 * 11/3 ? *",
       "invalid" : 0,
       "match" : {
          "epoch" : null,
@@ -559,6 +559,27 @@
       "type" : "quartz",
       "tz" : "Europe/London",
       "utc_offset" : 0
+   },
+   {
+      "as_quartz_string" : "4 * * L * ? *",
+      "as_string" : "4 * * L * ? *",
+      "as_unix_string" : "* * L * *",
+      "category" : "general",
+      "desc" : "unknown",
+      "expr" : "4 * * L * ? *",
+      "invalid" : 0,
+      "match" : {
+         "epoch" : null,
+         "is_match" : 0
+      },
+      "schedule" : {
+         "next_epoch" : null,
+         "next_n" : [],
+         "prev_epoch" : null
+      },
+      "type" : "quartz",
+      "tz" : "Europe/Paris",
+      "utc_offset" : 60
    },
    {
       "as_quartz_string" : "0 0 0 L * ? *",

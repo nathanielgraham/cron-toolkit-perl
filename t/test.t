@@ -13,7 +13,7 @@ diag "Base time: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . " (epoch $base_e
 
 my @tests = (
     {
-        expr => '14/5 * * * * ? *',
+        expr => '*/5 * * * * ? *',
         desc => 'every second',
         next_tm => $base->plus_seconds(1),
         prev_tm => $base->minus_seconds(1),
@@ -72,8 +72,6 @@ foreach my $t (@tests) {
     my $cron = Cron::Toolkit->new(expression => $t->{expr});
     diag "Testing: $t->{desc} (" . $cron->as_string . ")";
 
-    print $cron->dump_tree;
-    print Dumper($cron->{raw_fields});
     #print $cron->dump_tree . "\n";
     # next()
     my $next_epoch = $cron->next($base_epoch);
