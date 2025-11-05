@@ -238,25 +238,11 @@ sub join_parts {
 }
 
 sub format_time {
-   my ($sec, $min, $hour, $opts) = @_;
-   $opts ||= {};
-
-   # Normalize
-   $sec  //= 0;
-   $min  //= 0;
-   $hour //= 0;
-
-   # AM/PM
-   my $ampm = $hour >= 12 ? 'PM' : 'AM';
-   my $h12  = $hour % 12;
-   $h12     = 12 if $h12 == 0;
-
-   # Format
-   my $time = sprintf("%d:%02d", $h12, $min);
-   $time .= sprintf(":%02d", $sec) unless $opts->{omit_seconds_if_zero} && $sec == 0;
-   $time .= " $ampm";
-
-   return $time;
+    my ($sec, $min, $hour) = @_;
+    return "midnight" if $hour == 0 && $min == 0 && $sec == 0;
+    my $ampm = $hour >= 12 ? 'PM' : 'AM';
+    $hour = $hour % 12 || 12;
+    return sprintf("%d:%02d:%02d %s", $hour, $min, $sec, $ampm);
 }
 
 sub is_midnight { my ( $h, $m, $s ) = @_; return $h == 0 && $m == 0 && $s == 0; }

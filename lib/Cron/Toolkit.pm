@@ -108,9 +108,9 @@ sub _new {
    elsif ( $fields[3] eq '*' && $fields[5] ne '?' ) {
       $fields[3] = '?';
    }
-   elsif ( $fields[3] ne '?' && $fields[5] ne '?' ) {
-      die "dow and dom cannot both be specified\n";
-   }
+   #elsif ( $fields[3] ne '?' && $fields[5] ne '?' ) {
+   #   die "dow and dom cannot both be specified\n";
+   #}
    elsif ( $fields[3] eq '?' && $fields[5] eq '?' ) {
       die "dow and dom cannot both be unspecified\n";
    }
