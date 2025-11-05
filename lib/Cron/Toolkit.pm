@@ -7,6 +7,7 @@ use strict;
 use warnings;
 use Time::Moment;
 use Cron::Toolkit::Utils qw(:all);
+use Cron::Toolkit::Visitor::SemanticEnglishVisitor;
 use Cron::Toolkit::Pattern::CompositePattern;
 use Cron::Toolkit::Pattern::LeafPattern;
 use Cron::Toolkit::Matcher;
@@ -152,7 +153,7 @@ sub _build_tree {
    my @types = qw(second minute hour dom month dow year);
    for my $i ( 0 .. $#types ) {
       my $node = $self->_build_node( $types[$i], $self->{fields}[$i] );
-      #$node = $self->_optimize_node( $node, $types[$i] );
+      $node = $self->_optimize_node( $node, $types[$i] );
       $self->{root}->add_child($node);
    }
    $self->_finalize_dow_root();
@@ -178,9 +179,15 @@ sub _optimize_node {
          $min    = 0 if $field eq 'dow';
          @values = ( $min .. $max );
       }
+
       elsif ( $base_node->{type} eq 'single' ) {
-         @values = ( $base_node->{value} .. $max );
+         my $start = $base_node->{value};
+         @values = ( $start .. $max );
       }
+
+      #      elsif ( $base_node->{type} eq 'single' ) {
+      #         @values = ( $base_node->{value} .. $max );
+      #      }
       elsif ( $base_node->{type} eq 'range' ) {
          my ( $start, $end ) = map { $_->{value} } @{ $base_node->{children} };
          @values = ( $start .. $end );
@@ -603,7 +610,8 @@ sub env {
 
 sub describe {
    my ($self) = @_;
-   my $visitor = Cron::Toolkit::Visitor::EnglishVisitor->new();
+   #my $visitor = Cron::Toolkit::Visitor::EnglishVisitor->new();
+   my $visitor = Cron::Toolkit::Visitor::SemanticEnglishVisitor->new();
    return $self->{root}->traverse($visitor);
 }
 
@@ -824,41 +832,42 @@ sub new_from_crontab {
 # dump_tree – pretty-print the AST
 # ------------------------------------------------------------------
 sub dump_tree {
-    my ( $self, $node, $prefix, $is_last, $field_idx ) = @_;
-    $node      //= $self->{root};
-    $prefix    //= '';
-    $is_last   //= 1;               # root is the only top-level node
-    $field_idx //= -1;              # -1 = root
+   my ( $self, $node, $prefix, $is_last, $field_idx ) = @_;
+   $node      //= $self->{root};
+   $prefix    //= '';
+   $is_last   //= 1;               # root is the only top-level node
+   $field_idx //= -1;              # -1 = root
 
-    # ----- field label (once per top-level field) -----------------
-    my @field_names = qw(second minute hour dom month dow year);
-    my $label = '';
-    if ( $field_idx >= 0 && $field_idx < @field_names ) {
-        $label = $field_names[$field_idx] . ' ';
-    }
+   # ----- field label (once per top-level field) -----------------
+   my @field_names = qw(second minute hour dom month dow year);
+   my $label       = '';
+   if ( $field_idx >= 0 && $field_idx < @field_names ) {
+      $label = $field_names[$field_idx] . ' ';
+   }
 
-    # ----- node description ---------------------------------------
-    my $type  = $node->{type}  // 'root';
-    my $value = $node->{value} // '';
-    my $desc  = ucfirst($type);
-    $desc .= " ($value)" if $value ne '';
+   # ----- node description ---------------------------------------
+   my $type  = $node->{type}  // 'root';
+   my $value = $node->{value} // '';
+   my $desc  = ucfirst($type);
+   $desc .= " ($value)" if $value ne '';
 
-    # ----- connector ------------------------------------------------
-    my $connector = $field_idx < 0 ? '' : ( $is_last ? '└─ ' : '├─ ' );
-    say $prefix . $connector . $label . $desc;
+   # ----- connector ------------------------------------------------
+   my $connector = $field_idx < 0 ? '' : ( $is_last ? '└─ ' : '├─ ' );
+   say $prefix . $connector . $label . $desc;
 
-    # ----- recurse into children -----------------------------------
-    my $children = $node->{children} // [];
-    return unless @$children;
+   # ----- recurse into children -----------------------------------
+   my $children = $node->{children} // [];
+   return unless @$children;
 
-    my $new_prefix = $prefix . ( $is_last ? '   ' : '│  ' );
-    for my $i ( 0 .. $#$children ) {
-        my $child      = $children->[$i];
-        my $child_last = ( $i == $#$children );
-        # Pass the *same* field index to all children of a field node
-        my $child_idx  = ( $field_idx >= 0 ) ? $field_idx : $i;
-        $self->dump_tree( $child, $new_prefix, $child_last, $child_idx );
-    }
+   my $new_prefix = $prefix . ( $is_last ? '   ' : '│  ' );
+   for my $i ( 0 .. $#$children ) {
+      my $child      = $children->[$i];
+      my $child_last = ( $i == $#$children );
+
+      # Pass the *same* field index to all children of a field node
+      my $child_idx = ( $field_idx >= 0 ) ? $field_idx : $i;
+      $self->dump_tree( $child, $new_prefix, $child_last, $child_idx );
+   }
 }
 
 sub _rebuild_from_node {

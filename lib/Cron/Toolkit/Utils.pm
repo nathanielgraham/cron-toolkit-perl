@@ -8,6 +8,7 @@ our @EXPORT_OK = qw(
   ordinal_list step_ordinal complex_join normalize generate_list_desc %limits %dow_map_unix @FIELDS %LIMITS
   %month_map %dow_map_quartz %month_names %day_names %nth_names %unit_labels %ordinal_suffix %joiners %templates
 );
+
 our %EXPORT_TAGS = ( all => [@EXPORT_OK] );
 our %month_map   = (
    JAN       => 1,
@@ -80,6 +81,7 @@ our %month_names = (
    11 => 'November',
    12 => 'December'
 );
+
 our @fields = qw(second minute hour dom month dow year);
 our %day_names   = ( 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday' );
 our %nth_names   = ( 1 => 'first',  2 => 'second', 3 => 'third',   4 => 'fourth',    5 => 'fifth' );
@@ -237,27 +239,26 @@ sub join_parts {
 
 sub format_time {
    my ($sec, $min, $hour, $opts) = @_;
-   $opts //= {};
+   $opts ||= {};
 
-   my $time = sprintf("%d:%02d:%02d", $hour % 12 || 12, $min, $sec);
-   $time =~ s/:00$// if $opts->{omit_seconds_if_zero} && $sec == 0;
-   $time .= $hour >= 12 ? " PM" : " AM";
-   $time =~ s/^12:/12:/ if $hour < 12;  # 12:30 AM
-   $time =~ s/^0(\d):/ $1:/;  # 09:30 → 9:30
+   # Normalize
+   $sec  //= 0;
+   $min  //= 0;
+   $hour //= 0;
+
+   # AM/PM
+   my $ampm = $hour >= 12 ? 'PM' : 'AM';
+   my $h12  = $hour % 12;
+   $h12     = 12 if $h12 == 0;
+
+   # Format
+   my $time = sprintf("%d:%02d", $h12, $min);
+   $time .= sprintf(":%02d", $sec) unless $opts->{omit_seconds_if_zero} && $sec == 0;
+   $time .= " $ampm";
+
    return $time;
 }
 
-
-sub format_time2 {
-   my ( $s, $m, $h ) = @_;
-   $h //= 0;
-   $m //= 0;
-   $s //= 0;
-   return '' unless $h =~ /^\d+$/ && $m =~ /^\d+$/ && $s =~ /^\d+$/;
-   my $h12 = $h % 12;
-   $h12 = 12 if $h12 == 0;
-   return sprintf '%d:%02d:%02d %s', $h12, $m, $s, ( $h >= 12 ) ? 'PM' : 'AM';
-}
 sub is_midnight { my ( $h, $m, $s ) = @_; return $h == 0 && $m == 0 && $s == 0; }
 sub time_suffix { my $h = shift; return $h == 0 ? 'midnight' : $h == 12 ? 'noon' : ''; }
 sub field_unit  { my ( $f, $c ) = @_; $c //= 1; my ( $s, $p ) = @{ $unit_labels{$f} }; return $c == 1 ? $s : $p; }

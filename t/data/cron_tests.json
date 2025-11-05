@@ -97,7 +97,7 @@
       "as_unix_string" : "0,10,20,30,40,50 * * * *",
       "category" : "general",
       "desc" : "at midnight 0, 10, 20, 30, 40 and 50",
-      "expr" : "*/10 * * * *",
+      "expr" : "3 */10 * * * ? *",
       "invalid" : 0,
       "match" : {
          "epoch" : null,
@@ -108,7 +108,7 @@
          "next_n" : [],
          "prev_epoch" : null
       },
-      "type" : "unix",
+      "type" : "quartz",
       "tz" : null,
       "utc_offset" : 0
    },
