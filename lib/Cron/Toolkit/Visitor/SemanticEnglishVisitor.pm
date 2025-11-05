@@ -157,14 +157,19 @@ sub _render {
 }
 
 # ----------------------------------------------------------------------
-# Custom format_time — NO IMPORT
+# Custom format_time
 # ----------------------------------------------------------------------
 sub _format_time {
    my ( $self, $sec, $min, $hour ) = @_;
    return "midnight" if $hour == 0 && $min == 0 && $sec == 0;
    my $ampm = $hour >= 12 ? 'PM' : 'AM';
    $hour = $hour % 12 || 12;
-   return sprintf( "%d:%02d:%02d %s", $hour, $min, $sec, $ampm );
+   if ( $sec == 0 ) {
+      return sprintf( "%d:%02d %s", $hour, $min, $ampm );
+   }
+   else {
+      return sprintf( "%d:%02d:%02d %s", $hour, $min, $sec, $ampm );
+   }
 }
 
 # ----------------------------------------------------------------------
@@ -216,11 +221,16 @@ sub _render_field_part {
    my $kind = $field->{kind};
 
    if ( $kind eq 'value' ) {
-      my $val = $field->{value};
-      return '' if $val == 0;
-      my $unit   = $info->{unit}   || 'unit';
-      my $plural = $info->{plural} || 'units';
-      return "$val " . ( $val == 1 ? $unit : $plural );
+      my $v = $field->{value};
+      return '' if $v == 0 && $info->{unit} =~ /^(second|minute|hour)$/;
+
+      # Special case: single year → just "2025", not "2025 years"
+      if ( $info->{type} eq 'year' ) {
+         return "$v";
+      }
+
+      my $u = $v == 1 ? $info->{unit} : $info->{plural};
+      return "$v $u";
    }
 
    if ( $kind eq 'range' ) {
