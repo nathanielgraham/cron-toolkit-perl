@@ -2,10 +2,11 @@ package Cron::Toolkit::Visitor::SemanticEnglishVisitor;
 use strict;
 use warnings;
 use parent 'Cron::Toolkit::Visitor';
+use Data::Dumper;
 
-use Cron::Toolkit::Utils qw(
-  num_to_ordinal %month_names %day_names join_parts
-);
+use Cron::Toolkit::Utils qw(:all);
+#  num_to_ordinal %month_names %day_names join_parts
+#);
 
 # ----------------------------------------------------------------------
 # Constructor
@@ -13,7 +14,6 @@ use Cron::Toolkit::Utils qw(
 sub new {
    my $class = shift;
    my $self  = $class->SUPER::new(@_);
-   $self->{model} = { time => {}, date => {} };
    return $self;
 }
 
@@ -21,6 +21,17 @@ sub new {
 # Entry point
 # ----------------------------------------------------------------------
 sub visit {
+   my ( $self, $node, @results ) = @_;
+
+   #print Dumper($node);
+   #return $self->_parse_node($node) if $node->{type} eq 'root';
+   #print "$node->{field_type} = " . $self->_parse_node($node) . " \n";
+   print " -- " . $self->_parse_node($node). " ";
+   #print Dumper($node);
+   return 'hello';
+}
+
+sub visit2 {
    my ( $self, $node, @results ) = @_;
    return $self->_render if $node->{type} eq 'root';
 
@@ -173,10 +184,12 @@ sub _format_time {
 }
 
 # ----------------------------------------------------------------------
-# _render_time — FINAL
+# _render_time
 # ----------------------------------------------------------------------
 sub _render_time {
    my ( $self, $t ) = @_;
+
+   #print Dumper($t);
    my $s = $t->{second} // { kind => 'every' };
    my $m = $t->{minute} // { kind => 'every' };
    my $h = $t->{hour}   // { kind => 'every' };
@@ -186,7 +199,9 @@ sub _render_time {
    # 1. All fixed
    if ( $s->{kind} eq 'value' && $m->{kind} eq 'value' && $h->{kind} eq 'value' ) {
       my $time = $self->_format_time( $s->{value}, $m->{value}, $h->{value} );
-      return $time eq 'midnight' ? "midnight every day" : "$time every day";
+
+      #return $time eq 'midnight' ? "midnight every day" : "$time every day";
+      return $time;
    }
 
    # 2. Unified rendering
@@ -195,6 +210,8 @@ sub _render_time {
       { data => $m, unit => 'minute', plural => 'minutes', type => 'min' },
       { data => $h, unit => 'hour',   plural => 'hours',   type => 'hour' },
    );
+
+   #print Dumper(\@fields);
 
    for my $i ( 0 .. 2 ) {
       my $f    = $fields[$i];
@@ -213,8 +230,63 @@ sub _render_time {
    return join( ', ', @parts ) || 'every hour';
 }
 
+sub _parse_node {
+   my ( $self, $node ) = @_;
+   my $type = $node->{type};
+   #print Dumper($node);
+   #my $unit = $node->{field_type} =~ /^dom|dow$/ ? 'day' : $node->{field_type};
+   if ( $type eq 'single' ) {
+      return $node->value;
+   }
+   elsif ( $type eq 'wildcard' ) {
+      return "every";
+   }
+
+   elsif ( $type eq 'range' ) {
+      my ( $from, $to ) = map { $_->value } @{ $node->{children} };
+      return "from $from to $to";
+   }
+   elsif ( $node->type eq 'step' ) {
+      my $string;
+      my ( $base, $step ) = @{ $node->children };
+
+      my $unit = $node->field =~ /^dom|dow$/ ? 'day' : $node->field;
+      my $limit = $LIMITS{ $node->field }->[1];
+      my $from = $base->type eq 'range' ? $self->_parse_node($base) 
+               : "from $base->{value} to $limit";
+      $step = num_to_ordinal( $step->value );
+
+      return "every $step $unit $base";
+   }
+   elsif ( $node->type eq 'list' ) {
+      my @list;
+      push (@list, $self->_parse_node($_)) for @{ $node->children };
+      print Dumper(\@list);
+      return join_parts(@list);
+   }
+   elsif ( $node->type eq 'nth' ) {
+      my $ordinal = num_to_ordinal( $node->value );
+      return "on the $ordinal day of every month";
+   }
+
+   elsif ( $node->type eq 'last' ) {
+      return "on the last day of every month";
+      #return "on the " . num_to_ordinal( $field->{offset} ) . " to last day of every month";
+   }
+
+   elsif ( $node->type eq 'lastW' ) {
+      return "on the last weekday of every month";
+   }
+
+   elsif ( $node->type eq 'nearest_weekday' ) {
+      return "on the nearest weekday to the " . num_to_ordinal( $node->value ) . " of every month";
+   }
+   #print "NODE: $node->{type}, $node->{field_type}\n";
+   #print Dumper($node);
+}
+
 # ----------------------------------------------------------------------
-# Unified field renderer — FINAL
+# Unified field renderer
 # ----------------------------------------------------------------------
 sub _render_field_part {
    my ( $self, $field, $info ) = @_;
@@ -222,15 +294,17 @@ sub _render_field_part {
 
    if ( $kind eq 'value' ) {
       my $v = $field->{value};
-      return '' if $v == 0 && $info->{unit} =~ /^(second|minute|hour)$/;
-
-      # Special case: single year → just "2025", not "2025 years"
-      if ( $info->{type} eq 'year' ) {
-         return "$v";
+      if ( $info->{unit} =~ /^(second|minute|hour)$/ ) {
+         return '' if $v == 0;
+         my $u = $v == 1 ? $info->{unit} : $info->{plural};
+         return "$v $u";
       }
-
-      my $u = $v == 1 ? $info->{unit} : $info->{plural};
-      return "$v $u";
+      elsif ( $info->{type} eq 'year' ) {
+         return $v;
+      }
+      else {
+         return $self->_format_scalar( $v, $info->{type} );
+      }
    }
 
    if ( $kind eq 'range' ) {
@@ -283,7 +357,7 @@ sub _render_field_part {
 }
 
 # ----------------------------------------------------------------------
-# Format scalar — FINAL
+# Format scalar
 # ----------------------------------------------------------------------
 sub _format_scalar {
    my ( $self, $val, $type ) = @_;
@@ -297,11 +371,13 @@ sub _format_scalar {
 }
 
 # ----------------------------------------------------------------------
-# _render_date — FINAL
+# _render_date
 # ----------------------------------------------------------------------
 sub _render_date {
    my ( $self, $d ) = @_;
    my @parts;
+
+   print Dumper($d);
 
    # In _render_date
    my @fields = (
@@ -311,6 +387,7 @@ sub _render_date {
       { data => $d->{year},  unit => 'year',  plural => 'years',  type => 'year' },
    );
 
+   #print Dumper(\@fields);
    for my $f (@fields) {
       next unless $f->{data};
       my $part = $self->_render_field_part( $f->{data}, $f );
@@ -326,8 +403,10 @@ sub _render_date {
 # ----------------------------------------------------------------------
 sub _combine {
    my ( $self, $time, $date ) = @_;
-   return $time if !$date || $date eq 'every day';
-   return "$time, $date";
+
+   #return $time if !$date || $date eq 'every day';
+   #return "$time, $date";
+   return "TIME: $time -- DATE:  $date";
 }
 
 1;

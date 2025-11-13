@@ -223,13 +223,17 @@ sub generate_list_desc {
 }
 sub fill_template { my ( $id, $data ) = @_; my $tpl = $templates{$id} or return ''; $tpl =~ s/{(\w+)}/$data->{$1}||''/ge; return $tpl; }
 
-#sub num_to_ordinal { my $n = shift // return ''; return $nth_names{$n} // "$n${ordinal_suffix{$n}//''}"; }
 sub num_to_ordinal {
-   my $n = shift // return '';
-   if ( $nth_names{$n} ) {
-      return $nth_names{$n};    # Full: 'first', 'second', 'third' (non-numeric, keep prose-y)
-   }
-   return "$n" . ($ordinal_suffix{$n} // '');
+    my $n = shift;
+    #return '' unless defined $n;
+    #return 'first'  if $n == 1;
+    #return 'second' if $n == 2;
+    #return 'third'  if $n == 3;
+    return "$n" . (
+        $n % 10 == 1 && $n != 11 ? 'st' :
+        $n % 10 == 2 && $n != 12 ? 'nd' :
+        $n % 10 == 3 && $n != 13 ? 'rd' : 'th'
+    );
 }
 
 sub join_parts {

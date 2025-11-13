@@ -18,9 +18,9 @@ sub add_child {
     my ($self, $child) = @_;
     push @{$self->{children}}, $child;
 }
-sub get_children {
+sub children {
     my ($self) = @_;
-    return @{$self->{children}};
+    return $self->{children};
 }
 sub traverse {
     my ($self, $visitor) = @_;
@@ -38,23 +38,24 @@ sub is_match {
     my $visitor = Cron::Toolkit::Visitor::MatchVisitor->new(value => $value, tm => $tm);
     return $self->traverse($visitor);
 }
-sub to_english {
-    my ($self, $field_type) = @_;
-    my $visitor = Cron::Toolkit::Visitor::EnglishVisitor->new(field_type => $field_type);
-    return $self->traverse($visitor);
+
+sub type {
+    my ($self, $value) = @_;
+    $self->{type} = $value if defined $value;
+    return $self->{type};  # Return the value (either set or current)
 }
-sub dump_tree {
-    my ($node, $indent, $prefix) = @_;
-    $indent //= 0; $prefix //= '';
-    my $line = $prefix . "├── " . ucfirst($node->{type});
-    $line .= " ($node->{value})" if $node->{value};
-    print "$line\n";
-    return unless $node->{children} && @{$node->{children}};
-    my $last = $node->{children}[-1];
-    for my $i (0 .. $#{ $node->{children} }) {
-        my $child = $node->{children}[$i];
-        my $new_prefix = $prefix . ($child eq $last ? ' ' : '│ ');
-        dump_tree($child, $indent + 2, $new_prefix . '├── ');
-    }
+
+sub field {
+    my ($self, $value) = @_;
+    $self->{field_type} = $value if defined $value;
+    return $self->{field_type}; 
 }
+
+sub value {
+    my ($self, $value) = @_;
+    $self->{value} = $value if defined $value;
+    return $self->{value};
+}
+
+
 1;

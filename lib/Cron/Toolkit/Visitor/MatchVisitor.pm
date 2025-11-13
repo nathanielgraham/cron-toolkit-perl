@@ -19,16 +19,16 @@ sub visit {
       return 1;
    }
 
-   my $val = 0 + $self->{value};
+   my $val = $self->{value};
    if ( $type eq 'single' ) {
-      return $val == ( 0 + $node->{value} ) ? 1 : 0;
+      return $val == ( $node->{value} ) ? 1 : 0;
    }
    elsif ( $type eq 'step_value' ) {
-      return 0 + $node->{value};
+      return $node->{value};
    }
    elsif ( $type eq 'range' ) {
-      my $min = 0 + $node->{children}[0]{value};
-      my $max = 0 + $node->{children}[1]{value};
+      my $min = $node->{children}[0]{value};
+      my $max = $node->{children}[1]{value};
       return $val >= $min && $val <= $max ? 1 : 0;
    }
    elsif ( $type eq 'list' ) {
@@ -43,7 +43,7 @@ sub visit {
    #   return any { $val == ( 0 + $_->{value} ) } @{ $node->{children} } ? 1 : 0;
    #}
    elsif ( $type eq 'step' ) {
-      my $step = 0 + $node->{children}[1]{value};
+      my $step = $node->{children}[1]{value};
       return 0 if $step <= 0;
       return $self->_matches_step( $node->{children}[0], $step, $val );
    }

@@ -3,9 +3,9 @@
       "as_quartz_string" : "1 * * * * ? *",
       "as_string" : "1 * * * * ? *",
       "as_unix_string" : "* * * * *",
-      "category" : "general",
+     "category" : "general",
       "desc" : "at midnight every day",
-      "expr" : "1 * 1-3,5 */3 * ? *",
+      "expr" : "1 * 1-3,5 2-5/3 * ? *",
       "invalid" : 0,
       "match" : {
          "epoch" : 1761174060,
@@ -30,7 +30,7 @@
       "as_unix_string" : "* * * * 1-3",
       "category" : "general",
       "desc" : "at midnight Monday through Wednesday",
-      "expr" : "* * * * MON,TUE,WED",
+      "expr" : "2 2 * ? * MON,TUE,WED *",
       "invalid" : 0,
       "match" : {
          "epoch" : null,
@@ -41,7 +41,7 @@
          "next_n" : [],
          "prev_epoch" : null
       },
-      "type" : "unix",
+      "type" : "quartz",
       "tz" : null,
       "utc_offset" : 0
    },

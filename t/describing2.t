@@ -29,7 +29,7 @@ push @tests, (
     { expr => '0 0 0 L * ? 2025', desc => 'Last day of each month in 2025' },
     { expr => '0 0 0 ? * 1#5 *', desc => 'Fifth Sunday' },
     { expr => '0 0 0 1-31/7 * ? *', desc => 'Every 7th day starting 1st' },
-    { expr => '0 0 0 ? * 6L *', desc => 'Last Saturday' },
+    { expr => '0 0 0 ? * L *', desc => 'Last Saturday' },
     { expr => '0 0 0 10W * ? *', desc => 'Nearest weekday to 10th' },
 );
 
@@ -40,5 +40,6 @@ for my $test (@valid_desc) {
     if ( $test->{tz} ) { $cron->time_zone( $test->{tz} ); }
 
     print $cron->as_string . "\n";
+    print $cron->dump_tree . "\n\n";
     print $cron->describe . "\n\n";
 }
