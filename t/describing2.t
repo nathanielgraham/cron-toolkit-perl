@@ -4,6 +4,7 @@ use warnings;
 use Test::More 0.88;
 use Cron::Toolkit;
 use JSON::MaybeXS;
+use Data::Dumper;
 
 open my $fh, '<', 't/data/cron_tests.json' or BAIL_OUT("JSON missing");
 my $json = do { local $/; <$fh> };
@@ -37,9 +38,10 @@ my @valid_desc = grep { !$_->{invalid} && ($_->{desc} || 1) } @tests;
 
 for my $test (@valid_desc) {
     my $cron = Cron::Toolkit->new( expression => $test->{expr} );
-    if ( $test->{tz} ) { $cron->time_zone( $test->{tz} ); }
+    #if ( $test->{tz} ) { $cron->time_zone( $test->{tz} ); }
 
+    #print Dumper($cron->{fields});
     print $cron->as_string . "\n";
-    print $cron->dump_tree . "\n\n";
+    #print $cron->dump_tree . "\n\n";
     print $cron->describe . "\n\n";
 }

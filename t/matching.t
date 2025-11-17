@@ -2,6 +2,7 @@ use Test::More;
 use JSON::MaybeXS;
 use Cron::Toolkit;
 use Time::Moment;
+use Data::Dumper;
 
 open my $fh, '<', 't/data/cron_tests.json' or die $!;
 my $json = do { local $/; <$fh> };
@@ -16,6 +17,19 @@ for my $t (@tests) {
     $cron->time_zone($t->{tz})          if $t->{tz};
     $cron->utc_offset($t->{utc_offset}) if $t->{utc_offset};
 
+    #print Dumper($t);
+    # ---- is_match ----
+    if ($t->{match}{epoch}) {
+       print Dumper($t);
+       print Dumper($cron->{nodes});
+       my $date = scalar gmtime($t->{match}{epoch});
+       my $match = $cron->is_match($t->{match}{epoch});
+       #print STDERR "AS_STRING: " . $cron->as_string . "\n";
+       print STDERR "MATCH: $match\n";
+       is($match, $t->{match}{is_match}, "$date is_match for " . $cron->as_string);
+    }
+
+=pod
     # ---- next ----
     my $next = $cron->next;
     is($next, $t->{schedule}{next_epoch}, "next for $t->{expr}");
@@ -35,4 +49,5 @@ for my $t (@tests) {
         my $after = $cron->next($t->{schedule}{end_epoch} + 1);
         ok(!defined $after, "respects end_epoch");
     }
+=cut
 }

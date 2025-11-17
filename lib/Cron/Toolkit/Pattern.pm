@@ -1,16 +1,15 @@
 package Cron::Toolkit::Pattern;
 use strict;
 use warnings;
-use Cron::Toolkit::Visitor::EnglishVisitor;
-use Cron::Toolkit::Visitor::MatchVisitor;
+use Cron::Toolkit::Utils qw(:all);
 
 sub new {
     my ($class, %args) = @_;
     my $self = bless {
-        type => $args{type} // die "type required",
         children => [],
+        field_type =>  $args{field_type}
     }, $class;
-    $self->{field_type} = $args{field_type} if $args{field_type};
+    $self->{value} = $args{value} if defined $args{value};
 
     return $self;
 }
@@ -18,25 +17,15 @@ sub add_child {
     my ($self, $child) = @_;
     push @{$self->{children}}, $child;
 }
+
 sub children {
     my ($self) = @_;
     return $self->{children};
 }
-sub traverse {
-    my ($self, $visitor) = @_;
-    my $type = $self->{type};
-    # Direct for range (raw in visit)
-    if ($type eq 'range') {
-        return $visitor->visit($self, ());
-    }
-    # Recurse for list/step (flags/extract)
-    my @child_results = map { $_->traverse($visitor) } @{$self->{children}};
-    return $visitor->visit($self, @child_results);
-}
-sub is_match {
-    my ($self, $value, $tm) = @_;
-    my $visitor = Cron::Toolkit::Visitor::MatchVisitor->new(value => $value, tm => $tm);
-    return $self->traverse($visitor);
+
+sub has_children {
+   my $self = shift;
+   return scalar @{ $self->{children} } ? 1 : 0;
 }
 
 sub type {
@@ -45,10 +34,10 @@ sub type {
     return $self->{type};  # Return the value (either set or current)
 }
 
-sub field {
+sub field_type {
     my ($self, $value) = @_;
     $self->{field_type} = $value if defined $value;
-    return $self->{field_type}; 
+    return $self->{field_type};
 }
 
 sub value {
@@ -57,5 +46,48 @@ sub value {
     return $self->{value};
 }
 
+sub lowest {
+   my ( $self, $tm ) = @_;
+
+   my ( $min, $max ) = @{ $LIMITS{ $self->field_type } };
+   $max = $tm->length_of_month if $self->field_type eq 'dom';
+
+   for my $v ( $min .. $max ) {
+      my $test_tm = $tm;
+      $test_tm = $test_tm->with_day_of_month($v) if $self->field_type eq 'dom';
+      return $v if $self->match($v);
+   }
+   return;
+}
+
+sub highest {
+   my ( $self, $tm ) = @_;
+   my ( $min, $max ) = @{ $LIMITS{ $self->field_type } };
+   $max = $tm->length_of_month if $self->field_type eq 'dom';
+
+   for my $v ( reverse $min .. $max ) {
+      my $test_tm = $tm;
+      $test_tm = $test_tm->with_day_of_month($v) if $self->field_type eq 'dom';
+      return $v if $self->match($v);
+   }
+   return;
+}
+
+sub english_unit {
+   my $self = shift;
+   my $unit = $self->field_type =~ /^(dow|dom)$/ ? 'day' : $self->field_type;
+   $unit .= 's' if ($self->type eq 'single' && $self->value != 1);
+   return $unit;
+}
+
+sub english_value {
+   my ( $self ) = @_;
+   my $value = $self->{value};
+   die "missing value" unless defined $value;
+   return num_to_ordinal($value)              if $self->field_type eq 'dom';
+   return $MONTH_NAMES{$value}                if $self->field_type eq 'month';
+   return $DAY_NAMES{$value}                  if $self->field_type eq 'dow';
+   return $value;
+}
 
 1;

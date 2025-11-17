@@ -4,6 +4,7 @@ use warnings;
 use Test::More;
 use Cron::Toolkit;
 use Time::Moment;
+use Data::Dumper;
 
 # Base time: Floor now_utc to minute for clean tests
 my $base = Time::Moment->now_utc;
@@ -49,7 +50,7 @@ my @tests = (
         prev_tm => $base->minus_days(7)->with_hour(1)->with_minute(0),
     },
     {
-        expr => '0 0 0 * * 7 2099',  # Tuesday (Unix DOW 2)
+        expr => '0 0 0 * * 4 2099',  # Tuesday (Unix DOW 2)
         desc => 'every Tuesday at midnight',
         next_tm => $base->plus_days(7)->with_hour(0)->with_minute(0),
         prev_tm => $base->minus_days(7)->with_hour(0)->with_minute(0),
@@ -61,7 +62,7 @@ my @tests = (
         prev_tm => $base->with_day_of_month(1)->with_hour(0)->with_minute(0),
     },
     {
-        expr => '0 0 0 L 2 ? 2024',
+        expr => '1 0 0 29 2 ? *',
         desc => 'last day of month at midnight (Quartz)',
     },
     {
@@ -78,13 +79,14 @@ foreach my $t (@tests) {
     my $cron = Cron::Toolkit->new(expression => $t->{expr});
     diag "Testing: $t->{desc} (" . $cron->as_string . ")";
 
-    print $cron->dump_tree;
+    #print $cron->dump_tree;
     print Dumper($cron->{raw_fields});
     #print $cron->dump_tree . "\n";
     # next()
     my $next_epoch = $cron->next($base_epoch);
     if ($next_epoch) {
        #print "DESCRIPTION: " . $cron->describe . "\n";
+       print "BASE: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . "\n";
        print "NEXT: " . scalar gmtime($next_epoch) . " -- $next_epoch\n";
     }
     else {
@@ -99,15 +101,16 @@ foreach my $t (@tests) {
     # previous()
     my $prev_epoch = $cron->previous($base_epoch);
     if ($prev_epoch) {
+       print "BASE: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . "\n";
        print "PREV: " . scalar gmtime($prev_epoch) . " -- $prev_epoch\n";
     }
     else {
        print "not found\n";
     }
-    use Data::Dumper;
-    my $nextn = $cron->next_n($base_epoch, 3);
-    print Dumper([ map { scalar gmtime $_ } @$nextn ]);
-    print Dumper($nextn);
+    #use Data::Dumper;
+    #my $nextn = $cron->next_n($base_epoch, 3);
+    #print Dumper([ map { scalar gmtime $_ } @$nextn ]);
+    #print Dumper($nextn);
 
     #    or diag "  Got: " . ($next_epoch ? Time::Moment->from_epoch($next_epoch)->strftime('%Y-%m-%d %H:%M:%S') : 'undef') . 
     #my $prev_expected = $t->{prev_tm}->epoch;

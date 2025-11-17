@@ -4,7 +4,7 @@ use warnings;
 use parent 'Cron::Toolkit::Visitor';
 
 use Cron::Toolkit::Utils qw(
-    num_to_ordinal format_time %month_names %day_names
+    num_to_ordinal format_time %MONTH_NAMES %DAY_NAMES
     join_parts field_unit
 );
 
@@ -297,14 +297,14 @@ sub _join_date {
     if ( my $m = $data->{month} ) {
         my $txt;
         if ( $m->{kind} eq 'value' ) {
-            $txt = $month_names{ $m->{value} } || $m->{value};
+            $txt = $MONTH_NAMES{ $m->{value} } || $m->{value};
         }
         elsif ( $m->{kind} eq 'range' ) {
-            $txt = ( $month_names{ $m->{start} } || $m->{start} ) . " to "
-                 . ( $month_names{ $m->{end}   } || $m->{end} );
+            $txt = ( $MONTH_NAMES{ $m->{start} } || $m->{start} ) . " to "
+                 . ( $MONTH_NAMES{ $m->{end}   } || $m->{end} );
         }
         elsif ( $m->{kind} eq 'list' ) {
-            my @names = map { $month_names{ $_->{value} } || $_->{value} }
+            my @names = map { $MONTH_NAMES{ $_->{value} } || $_->{value} }
                 @{ $m->{items} };
             $txt = join_parts(@names);
         }
@@ -315,16 +315,16 @@ sub _join_date {
     if ( my $w = $data->{dow} ) {
         my $txt;
         if ( $w->{kind} eq 'value' ) {
-            $txt = "every " . ( $day_names{ $w->{value} } || $w->{value} );
+            $txt = "every " . ( $DAY_NAMES{ $w->{value} } || $w->{value} );
         }
         elsif ( $w->{kind} eq 'range' ) {
             $txt = "every "
-                 . ( $day_names{ $w->{start} } || $w->{start} )
+                 . ( $DAY_NAMES{ $w->{start} } || $w->{start} )
                  . " through "
-                 . ( $day_names{ $w->{end}   } || $w->{end} );
+                 . ( $DAY_NAMES{ $w->{end}   } || $w->{end} );
         }
         elsif ( $w->{kind} eq 'list' ) {
-            my @names = map { $day_names{ $_->{value} } || $_->{value} }
+            my @names = map { $DAY_NAMES{ $_->{value} } || $_->{value} }
                 @{ $w->{items} };
             $txt = "every " . join_parts(@names);
         }
@@ -332,7 +332,7 @@ sub _join_date {
             $txt = "on the "
                  . num_to_ordinal( $w->{nth} )
                  . " "
-                 . ( $day_names{ $w->{dow} } || $w->{dow} )
+                 . ( $DAY_NAMES{ $w->{dow} } || $w->{dow} )
                  . " of every month";
         }
         push @parts, $txt if $txt;
