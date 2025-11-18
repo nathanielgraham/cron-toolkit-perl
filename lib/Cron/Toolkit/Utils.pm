@@ -3,7 +3,7 @@ use strict;
 use warnings;
 use Exporter qw(import);
 our @EXPORT_OK = qw(
-  format_time num_to_ordinal %DOW_MAP_UNIX %DOW_MAP_QUARTZ %MONTH_MAP 
+  format_time num_to_ordinal %DOW_MAP_UNIX %DOW_MAP_QUARTZ %MONTH_MAP
   %LIMITS %DOW_MAP_QUARTZ %MONTH_NAMES %DAY_NAMES %ALLOWED_CHARS %ALIASES
 );
 
@@ -83,16 +83,24 @@ our %MONTH_NAMES = (
    12 => 'December'
 );
 
-our %DAY_NAMES = ( 0 => 'Sunday', 1 => 'Monday', 2 => 'Tuesday', 3 => 'Wednesday', 4 => 'Thursday', 5 => 'Friday', 6 => 'Saturday' );
+our %DAY_NAMES = (
+   0 => 'Sunday',
+   1 => 'Monday',
+   2 => 'Tuesday',
+   3 => 'Wednesday',
+   4 => 'Thursday',
+   5 => 'Friday',
+   6 => 'Saturday',
+   7 => 'Sunday'
+);
 
-# Exported constants — UPPERCASE
 our %LIMITS = (
    second => [ 0,    59 ],
    minute => [ 0,    59 ],
    hour   => [ 0,    23 ],
    dom    => [ 1,    31 ],
    month  => [ 1,    12 ],
-   dow    => [ 0,    7 ],
+   dow    => [ 1,    7 ],
    year   => [ 1970, 2099 ],
 );
 
@@ -109,8 +117,8 @@ our %ALLOWED_CHARS = (
 our %ALIASES = (
    '@yearly'   => '0 0 0 1 1 ? *',
    '@annually' => '0 0 0 1 1 ? *',
-   '@monthly'  => '0 0 0 L ? * *',
-   '@weekly'   => '0 0 0 ? * ? *',
+   '@monthly'  => '0 0 0 L * ? *',
+   '@weekly'   => '0 0 0 ? * 1 *',
    '@daily'    => '0 0 0 * * ? *',
    '@midnight' => '0 0 0 * * ? *',
    '@hourly'   => '0 0 * * * ? *',

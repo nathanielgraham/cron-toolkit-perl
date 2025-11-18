@@ -50,9 +50,8 @@ sub new {
 
    # alias support
    if ( $expr =~ /^(@.*)/ ) {
-      my $alias = $1;
-      $expr = $ALIASES{$alias} // $expr;
-      print STDERR "DEBUG: Alias '$alias' mapped to '$expr'\n" if $ENV{Cron_DEBUG};
+      my $alias = lc($1);
+      $expr = $ALIASES{$alias} or die "no such alias: $alias";
    }
 
    my @fields     = split /\s+/, $expr;
@@ -236,8 +235,8 @@ sub _finalize_dow {
       $self->_finalize_dow($_) for @{ $dow_node->{children} };
    }
 
-   elsif ( $dow_node->type eq 'single' && $dow_node->{value} == 7 ) {
-      $dow_node->{value} = 0;
+   elsif ( $dow_node->type eq 'single' && $dow_node->{value} == 0 ) {
+      $dow_node->{value} = 7;
    }
 }
 
@@ -250,7 +249,6 @@ sub _build_node {
    # Validate characters using Utils.pm
    die "Invalid characters in $field: $value" unless $value =~ $ALLOWED_CHARS{$field};
 
-   # Get field limits, adjust DOW to [0-7]
    my ( $min, $max ) = @{ $LIMITS{$field} };
    $min = 0 if $field eq 'dow';
 

@@ -16,8 +16,8 @@ sub type {
 }
 
 sub match {
-   my ( $self, $tm ) = @_;
-   my $day = $self->{dow};
+   my ( $self, undef, $tm ) = @_;
+   my $day = $self->{dom};
    my $dom           = $tm->day_of_month;
    my $dow           = $tm->day_of_week;
    my $days_in_month = $tm->length_of_month;

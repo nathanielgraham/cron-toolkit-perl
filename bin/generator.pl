@@ -24,8 +24,8 @@ my @common_tzs = qw(
 my @common_offsets = qw(-300 0 60 540 -480 120);
 
 my $BASE        = Time::Moment->new(year => 2025, month => 10, day => 23);
-my $FAR_FUTURE  = Time::Moment->new(year => 2031, month => 12, day => 31);
-my $FAR_PAST    = Time::Moment->new(year => 1999, month => 1, day => 1);
+#my $FAR_FUTURE  = Time::Moment->new(year => 2031, month => 12, day => 31);
+#my $FAR_PAST    = Time::Moment->new(year => 1999, month => 1, day => 1);
 
 # ----------------------------------------------------------------------
 # Raw expressions: valid + invalid
@@ -52,6 +52,8 @@ my @raw_exprs = (
     '@daily',
     '@hourly',
     '@yearly',
+    '@monthly',
+    '@weekly',
 
     # Valid Quartz
     '0 0 * * * ?',
@@ -70,6 +72,7 @@ my @raw_exprs = (
     '0 30 14 * * ?',
     '0 30 14 * * ? 2025',
     '0 30 14 ? * 6',
+    '0 30 14 ? * 0',
     '0 30 14 ? * MON *',
     '*/15 * * * * ?',
     '0 0 0 * * 1#2 *',
@@ -79,8 +82,6 @@ my @raw_exprs = (
     '30 14 * JAN FOO',
     '30 14 * XYZ MON',
     '@bogus',
-    '@monthly',
-    '0 0 0 * * 1#2 ?',
     '0 0 0 * * 2 ?',
     '0 0 0 1,15 * * ?',
     'L * * * *',
@@ -120,30 +121,11 @@ for my $expr (@raw_exprs) {
         $cron->utc_offset($offset_min) if $offset_min && !$tz;
 
         my $actual_offset = $cron->utc_offset // 0;
-        my $local_base    = $BASE->with_offset_same_local($actual_offset);
-        my $base_epoch    = $local_base->epoch;
+        my $base_epoch    = $BASE->epoch;
 
-        my $far_past_epoch   = $FAR_PAST->with_offset_same_local($actual_offset)->epoch;
-        my $far_future_epoch = $FAR_FUTURE->with_offset_same_local($actual_offset)->epoch;
-
-        $cron->begin_epoch($far_past_epoch);
-        $cron->end_epoch($far_future_epoch);
-
-        my ($match_epoch, $is_match, $next_epoch, $next_n, $prev_epoch) = (undef, 0, undef, [], undef);
-
-=pod
-        eval {
-            $match_epoch = $cron->next($base_epoch) // $cron->next($far_past_epoch);
-            if (defined $match_epoch) {
-                $is_match  = $cron->is_match($match_epoch);
-                $next_epoch = $cron->next($match_epoch + 1);
-                $next_epoch = 1 
-                my $third   = defined $next_epoch ? $cron->next($next_epoch + 1) : undef;
-                $next_n     = [$match_epoch, $next_epoch, $third];
-            }
-            $prev_epoch = eval { $cron->previous_n($base_epoch, 1, 20000)->[0] };
-        };
-=cut
+        my $is_match  = $cron->is_match($base_epoch);
+        my $next_epoch = $cron->next($base_epoch);
+        my $prev_epoch = $cron->previous($base_epoch);
 
         push @data, {
             category         => "general",
@@ -156,12 +138,9 @@ for my $expr (@raw_exprs) {
             utc_offset       => $actual_offset,
             invalid          => 0,
             desc             => $desc,
-            match            => { epoch => $match_epoch, is_match => $is_match },
-            schedule         => {
-                next_epoch => $next_epoch,
-                prev_epoch => $prev_epoch,
-                next_n     => $next_n
-            }
+            base_epoch       => $base_epoch,
+            next_epoch       => $next_epoch,
+            prev_epoch       => $prev_epoch,
         };
     } or do {
         my $err = $@;
