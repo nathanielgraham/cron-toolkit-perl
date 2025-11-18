@@ -15,7 +15,7 @@ sub match {
 sub to_english {
    my ($self) = @_;
    my $rv = $self->english_value;
-   $rv .= " " . $self->english_unit if $self->field_type ne 'dow';
+   $rv = $self->field_type . " " . $rv if $self->field_type =~ /^second|minute|hour$/;
    return $rv;
 }
 

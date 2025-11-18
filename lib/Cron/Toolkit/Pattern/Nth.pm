@@ -36,7 +36,7 @@ sub to_english {
    my ($self) = @_;
    my $day = $DAY_NAMES{ $self->{dow} };
    my $nth = num_to_ordinal( $self->{nth} );
-   return "on the $nth $day of every month";
+   return "on the $nth $day";
 }
 
 1;

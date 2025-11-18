@@ -76,7 +76,7 @@ sub highest {
 sub english_unit {
    my $self = shift;
    my $unit = $self->field_type =~ /^(dow|dom)$/ ? 'day' : $self->field_type;
-   $unit .= 's' if ($self->type eq 'single' && $self->value != 1);
+   $unit .= 's' if ($self->type eq 'single' && $self->value != 1 && $self->field_type ne 'year');
    return $unit;
 }
 
@@ -84,7 +84,7 @@ sub english_value {
    my ( $self ) = @_;
    my $value = $self->{value};
    die "missing value" unless defined $value;
-   return num_to_ordinal($value)              if $self->field_type eq 'dom';
+   return 'the ' . num_to_ordinal($value)     if $self->field_type eq 'dom';
    return $MONTH_NAMES{$value}                if $self->field_type eq 'month';
    return $DAY_NAMES{$value}                  if $self->field_type eq 'dow';
    return $value;

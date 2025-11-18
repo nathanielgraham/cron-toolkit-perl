@@ -1,6 +1,5 @@
 package Cron::Toolkit;
 
-# ABSTRACT: Cron parser, describer, and scheduler with full Quartz support
 # VERSION
 $VERSION = 0.08;
 use strict;
@@ -644,11 +643,61 @@ sub _rebuild_from_node {
 
 sub describe {
    my $self = shift;
-   my ($s, $m, $h) = map { $_->value } grep { $_->type eq 'single' } @{ $self->{nodes} }[0..2];
-   my $hms = defined $h && defined $m && defined $s ? format_time($h, $m, $s) 
-           : join(', ', map { $_->to_english } @{ $self->{nodes} }[0..2]);
-   my $dmy = join(', ', map { $_->to_english } grep { $_->type ne 'unspecified' } @{ $self->{nodes} }[3..6]);
-   return "TIME: $hms DATE: $dmy\n";
+   my $hms;
+   my $dmy = '';
+   my @nodes;
+
+   my $wildcards = scalar grep { $_->type  eq 'wildcard' } @{ $self->{nodes} }[0..2];
+   my $singles = scalar grep { $_->type  eq 'single' } @{ $self->{nodes} }[0..2];
+
+   # dedupe wildcards
+   my $prev_type = '';
+   for my $node (@{ $self->{nodes} }) {
+      push @nodes, $node->type eq 'wildcard' && $prev_type eq 'wildcard' ? undef : $node;
+      $prev_type = $node->type;
+   }
+
+   # HMS
+   if ( $wildcards == 3 ) {
+      $hms = $nodes[0]->to_english;   
+   }
+   elsif ( $singles == 3 ) {
+      $hms = format_time(map { $_->value } reverse @nodes[0..2]);
+   }
+   else {
+      $hms = join(' of ', map { $_->to_english } grep { defined $_ && !($_->type eq 'single' && $_->value == 0) } @nodes[0..2]);
+   }
+
+   # DMY
+   if (defined $nodes[3] && $nodes[3]->type ne 'unspecified') {
+      if ($nodes[3]->type eq 'single') {
+         $dmy = 'on ' . $nodes[3]->to_english;
+      }
+      else {
+         $dmy = $nodes[3]->to_english;
+      }
+      $dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[3]->type eq 'wildcard';
+   }
+
+   if (defined $nodes[3] && $nodes[3]->type ne 'unspecified' && defined $nodes[5] && $nodes[5]->type ne 'unspecified') {
+      $dmy .= ' and ';
+   }
+
+   if (defined $nodes[5] && $nodes[5]->type ne 'unspecified') {
+      if ($nodes[5]->type =~ /^single|list$/) {
+         $dmy .= 'every ' . $nodes[5]->to_english;
+         $dmy .= ' in ' . $self->{nodes}[4]->to_english
+      }
+      else {
+         $dmy .= $nodes[5]->to_english;
+         $dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[5]->type eq 'wildcard';
+      }
+   }
+
+   if ( defined $nodes[6] && $nodes[6]->type ne 'wildcard' ) {
+      $dmy .= ' ' . $self->{nodes}[6]->to_english;
+   }
+   return "$hms $dmy";
 }
 
 # matching

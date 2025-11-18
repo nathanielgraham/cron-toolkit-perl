@@ -41,7 +41,8 @@ sub to_english {
       $rv .= " from $from to $to";
    }
    elsif ($base->type eq 'single') {
-      $rv .= " starting at " . $base->english_value;
+      $rv .= ' starting ';
+      $rv .= $base->field_type =~ /^second|minute|hour$/ ? 'at ' : 'on ' . $base->english_value;
    }
    return $rv;
 }

@@ -43,7 +43,7 @@ sub match {
 
 sub to_english {
    my $self = shift;
-   return "on the nearest weekday to the " . num_to_ordinal($self->{dom}) . " of every month";
+   return "on the nearest weekday to the " . num_to_ordinal($self->{dom});
 }
 
 1;

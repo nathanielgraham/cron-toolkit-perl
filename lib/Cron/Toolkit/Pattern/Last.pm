@@ -24,8 +24,8 @@ sub match {
 
 sub to_english {
    my ($self) = @_;
-   return "on the last day of every month" unless $self->{offset};
-   return "on the " . num_to_ordinal($self->{offset}) . " to last day of every month";
+   return "on the last day" unless $self->{offset};
+   return "on the " . num_to_ordinal($self->{offset}) . " to last day";
 }
 
 1;
