@@ -619,9 +619,6 @@ sub new_from_crontab {
    return @crons;
 }
 
-# ------------------------------------------------------------------
-# dump_tree – pretty-print the AST
-# ------------------------------------------------------------------
 sub dump_tree {
 }
 
@@ -738,7 +735,7 @@ sub next {
    my $tm_year_low = $self->_set_date( $tm, $year_node->field_type, $year_lowval );
    $tm = $tm_year_low if $tm->is_before($tm_year_low);
 
-   # this shortcut works for HMS due to consistent min/max limits
+   # this shortcut seems to work for HMS 
    NODE: foreach my $i ( 0 .. 2 ) {
       my $node = $self->{nodes}[$i];
 
@@ -750,7 +747,7 @@ sub next {
       if ( $tm->is_before($tm_low) ) {
          $tm = $self->_set_date( $tm, $node->field_type, $lowval );
       }
-      elsif ( $tm->is_after($tm_high) ) {
+      elsif ( $tm->is_after($tm_high) || $node->type eq 'wildcard' ) {
          $tm = $self->_set_date( $tm, $node->field_type, $lowval );
          $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
       }
@@ -806,7 +803,7 @@ sub previous {
       my $tm_high = $self->_set_date( $tm, $node->field_type, $highval );
       my $tm_low  = $self->_set_date( $tm, $node->field_type, $lowval );
 
-      if ( $tm->is_before($tm_low) ) {
+      if ( $tm->is_before($tm_low) || $node->type eq 'wildcard' ) {
          $tm = $self->_set_date( $tm, $node->field_type, $highval );
          $tm = $self->_minus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
       }

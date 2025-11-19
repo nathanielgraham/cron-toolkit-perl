@@ -33,6 +33,7 @@ my $BASE        = Time::Moment->new(year => 2025, month => 10, day => 23);
 my @raw_exprs = (
     # Valid Unix
     '* * * * *',
+    '*/70 * * * *',
     '* * * * MON,TUE,WED',
     '* * * * 7/2',
     '* * * * MON-FRI',

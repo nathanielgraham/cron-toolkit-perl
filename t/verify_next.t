@@ -14,6 +14,19 @@ diag "Base time: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . " (epoch $base_e
 
 my @tests = (
     {
+        expr => '0 0 0 ? * 3#3 *',
+        desc => 'nth third',
+        next_tm => $base->plus_seconds(1),
+        prev_tm => $base->minus_seconds(1),
+    },
+    {
+        expr => '* * * ? 2 1#5 *',
+        desc => 'nth third',
+        next_tm => $base->plus_seconds(1),
+        prev_tm => $base->minus_seconds(1),
+    },
+
+    {
         expr => '0 0 0 16W * ? *',
         desc => 'nearest weekday',
         next_tm => $base->plus_seconds(1),
@@ -26,7 +39,7 @@ my @tests = (
         prev_tm => $base->minus_seconds(1),
     },
     {
-        expr => '* * 3,16-22 * * ? *',
+        expr => '* * 16-22 * * ? *',
         desc => 'every second',
         next_tm => $base->plus_seconds(1),
         prev_tm => $base->minus_seconds(1),
@@ -39,6 +52,18 @@ my @tests = (
     },
     {
         expr => '21 * * * * ? *',
+        desc => 'every minute',
+        next_tm => $base->plus_minutes(1),
+        prev_tm => $base->minus_minutes(1),
+    },
+    {
+        expr => '* 21 * * * ? *',
+        desc => 'every minute',
+        next_tm => $base->plus_minutes(1),
+        prev_tm => $base->minus_minutes(1),
+    },
+    {
+        expr => '* * 2 * * ? *',
         desc => 'every minute',
         next_tm => $base->plus_minutes(1),
         prev_tm => $base->minus_minutes(1),
