@@ -90,4 +90,95 @@ sub english_value {
    return $value;
 }
 
+sub _dump_tree2 {
+    my ($self, $indent) = @_;
+    $indent //= '';
+
+    my $type = $self->type;
+
+    # Simple leaf values — inline
+    if ($type eq 'wildcard')     { return '*'; }
+    if ($type eq 'unspecified')  { return '?'; }
+    if ($type eq 'single')       { return $self->{value}; }
+    if ($type eq 'last')         { return $self->{value} // 'L'; }
+    if ($type eq 'lastW')        { return 'LW'; }
+    if ($type eq 'nearest_weekday') { return $self->{value}; }
+    if ($type eq 'nth')          { return $self->{value}; }
+
+    # Complex containers — tree structure
+    my @children = @{$self->{children}};
+    return '' unless @children;
+
+    my $out = "\n";
+
+    if ($type eq 'range') {
+        $out .= $indent . $children[0]->{value} . " - " . $children[1]->{value} . "\n";
+        return $out;
+    }
+
+    if ($type eq 'step') {
+        $out .= $children[0]->_dump_tree($indent) . "\n";
+        $out .= $indent . "└─ /" . $children[1]{value} . "\n";
+        return $out;
+    }
+
+    if ($type eq 'list') {
+        for my $i (0 .. $#children) {
+            my $prefix = ($i == $#children) ? '└─ ' : '├─ ';
+            my $next_indent = $indent . ($i == $#children) ? '   ' : '│  ';
+            $out .= $children[$i]->_dump_tree($next_indent, $prefix) . "\n";
+        }
+        chomp $out;
+        return $out;
+    }
+
+    return $type;
+}
+
+sub _dump_tree {
+    my ($self, $indent) = @_;
+    $indent //= '';
+
+    my $type = $self->type;
+
+    # Simple leaf values — inline
+    if ($type eq 'wildcard')     { return '*'; }
+    if ($type eq 'unspecified')  { return '?'; }
+    if ($type eq 'single')       { return $self->{value}; }
+    if ($type eq 'last')         { return $self->{value} // 'L'; }
+    if ($type eq 'lastW')        { return 'LW'; }
+    if ($type eq 'nearest_weekday') { return $self->{value}; }
+    if ($type eq 'nth')          { return $self->{value}; }
+
+    # Complex containers — nested tree
+    my @children = @{$self->{children} || []};
+    return '' unless @children;
+
+    my $out = "";
+
+    if ($type eq 'range') {
+        return $children[0]->_dump_tree($indent) . '-' . $children[1]->_dump_tree($indent);
+    }
+
+    if ($type eq 'step') {
+        my $base = $children[0]->_dump_tree($indent . '  ');
+        $out .= $base . "\n";
+        $out .= "${indent}└─ /$children[1]{value}";
+        return $out;
+    }
+
+    if ($type eq 'list') {
+        $out = "\n";
+        for my $i (0 .. $#children) {
+            my $prefix = ($i == $#children) ? '└─ ' : '├─ ';
+            my $next_indent = $indent . ($i == $#children ? '   ' : '│  ');
+            $out .= "${indent}$prefix" . $children[$i]->_dump_tree($next_indent) . "\n";
+        }
+        chomp $out;
+        return $out;
+    }
+
+    return $type;
+}
+
 1;

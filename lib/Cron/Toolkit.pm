@@ -244,9 +244,6 @@ sub _finalize_dow {
 sub _build_node {
    my ( $self, $field, $value ) = @_;
 
-   print STDERR "DEBUG: Parsing $field: '$value'\n" if $ENV{Cron_DEBUG};
-
-   # Validate characters using Utils.pm
    die "Invalid characters in $field: $value" unless $value =~ $ALLOWED_CHARS{$field};
 
    my ( $min, $max ) = @{ $LIMITS{$field} };
@@ -254,7 +251,7 @@ sub _build_node {
 
    my $node;
 
-   # Combined validation and node creation
+   # validation and node creation
    if ( $value eq '*' ) {
       $node = Cron::Toolkit::Pattern::Wildcard->new(
          value      => '*',
@@ -269,13 +266,34 @@ sub _build_node {
          field_type => $field
       );
    }
-   elsif ( $value =~ /^L(-\d+)?$/ ) {
-      die "Syntax: L only allowed in dom or dow, not $field"
+   elsif ( $value =~ /^(\d+)?L$/ ) {
+      my ($day) = ($1);
+      die "Syntax: L only allowed in dow or dom, not $field"
         unless $field =~ /^dom|dow$/;
-      my $offset = $1;
-      if ($offset) {
-         die "$field offset $offset too large" if ( $field eq 'dom' && $offset > 30 ) || ( $field eq 'dow' && $offset > 6 );
+
+      $node = Cron::Toolkit::Pattern::Last->new(
+         value => $value,
+         offset => 0,
+         field_type => $field,
+      );
+
+      if ( $field eq 'dom' ) {
+         die $day . "L not allowed in dom" if defined $day;
       }
+      else {
+         $day //= $max;
+         die "dow $day out of range [$min-$max]" unless $day >= $min && $day <= $max;
+         $node->{dow} = $day;
+      }
+   }
+   elsif ( $value =~ qr/^L-(\d+)$/ ) {
+      my $offset = $1;
+      die "Syntax: L only allowed in dom, not $field" unless  $field eq 'dom';
+
+      if ($offset) {
+         die "dom offset $offset too large" if $offset >= $max-1;
+      }
+
       $node = Cron::Toolkit::Pattern::Last->new(
          value      => $value,
          offset     => $offset,
@@ -620,6 +638,20 @@ sub new_from_crontab {
 }
 
 sub dump_tree {
+    my ($self, $indent) = @_;
+    my $out;
+
+    my @names = qw(second minute hour dom month dow year);
+    for my $i (0 .. $#{$self->{nodes}}) {
+        my $node = $self->{nodes}[$i];
+        my $name = $names[$i];
+
+        my $prefix = $i == 0 ? '┌─' : $i == $#{$self->{nodes}} ? '└─' : '├─';
+        my $child_indent = $i == $#{$self->{nodes}} ? '  ' : '│ ';
+
+        $out .= "$prefix $name: " . $node->_dump_tree($child_indent) . "\n";
+    }
+    return $out;
 }
 
 sub _rebuild_from_node {
@@ -657,7 +689,7 @@ sub describe {
       $hms = $nodes[0]->to_english;   
    }
    elsif ( $singles == 3 ) {
-      $hms = format_time(map { $_->value } reverse @nodes[0..2]);
+      $hms = format_time(map { $_->value } @nodes[0..2]);
    }
    else {
       $hms = join(' of ', map { $_->to_english } grep { defined $_ && !($_->type eq 'single' && $_->value == 0) } @nodes[0..2]);
@@ -671,7 +703,8 @@ sub describe {
       else {
          $dmy = $nodes[3]->to_english;
       }
-      $dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[3]->type eq 'wildcard';
+      #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[3]->type eq 'wildcard';
+      $dmy .= ' of ' . $self->{nodes}[4]->to_english;
    }
 
    if (defined $nodes[3] && $nodes[3]->type ne 'unspecified' && defined $nodes[5] && $nodes[5]->type ne 'unspecified') {
@@ -685,7 +718,8 @@ sub describe {
       }
       else {
          $dmy .= $nodes[5]->to_english;
-         $dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[5]->type eq 'wildcard';
+         #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[5]->type eq 'wildcard';
+         $dmy .= ' of ' . $self->{nodes}[4]->to_english;
       }
    }
 
@@ -730,27 +764,34 @@ sub next {
 
    my $tm = Time::Moment->from_epoch($clamped)->with_offset_same_instant( $self->{utc_offset} );
    $tm = $tm->plus_seconds(1);
+
+   # set year 
    my $year_node = $self->{nodes}[6];
    my $year_lowval = $year_node->lowest($tm) - 1;
    my $tm_year_low = $self->_set_date( $tm, $year_node->field_type, $year_lowval );
    $tm = $tm_year_low if $tm->is_before($tm_year_low);
 
-   # this shortcut seems to work for HMS 
+   # shortcut for HMS 
    NODE: foreach my $i ( 0 .. 2 ) {
       my $node = $self->{nodes}[$i];
-
       my $lowval  = $node->lowest($tm);
       my $highval = $node->highest($tm);
-      my $tm_high = $self->_set_date( $tm, $node->field_type, $highval );
-      my $tm_low  = $self->_set_date( $tm, $node->field_type, $lowval );
 
-      if ( $tm->is_before($tm_low) ) {
-         $tm = $self->_set_date( $tm, $node->field_type, $lowval );
-      }
-      elsif ( $tm->is_after($tm_high) || $node->type eq 'wildcard' ) {
-         $tm = $self->_set_date( $tm, $node->field_type, $lowval );
-         $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
-      }
+      #if ($curval >= $highval) {
+      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
+      #   $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
+      #}
+      #elsif ($node->type eq 'wildcard') {
+      #   $tm = $self->_plus_one( $tm, $node->field_type );
+      #}
+
+      #if ( $tm->is_before($tm_low) ) {
+      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
+      #}
+      #elsif ( $tm->is_after($tm_high) || $node->type eq 'wildcard' ) {
+      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
+      #   $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
+      #}
 
       for my $c ( $self->_field_value( $tm, $node->field_type ) .. $highval ) {
          my $c_tm    = $self->_set_date( $tm, $node->field_type, $c );
@@ -759,6 +800,10 @@ sub next {
             last NODE;
          }
       }
+
+      # flip odometer if no match
+      $tm = $self->_set_date( $tm, $node->field_type, $lowval );
+      $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
    }
 
    my $max_tm = Time::Moment->new(
@@ -772,8 +817,13 @@ sub next {
 
    my $max_iter = $tm->delta_days($max_tm);
 
-   # brute force approach needed for tricky DMY end-of-month and leap year calculations 
-   for my $day ( 0 .. $max_iter ) {
+   # the brute force approach for DMY is slightly  
+   # inneficient but the upsides make the trade-off worth it:  
+   # 1) a simple design that is easy to understand and debug
+   # 2) solves all tricky end-of-month and leap year calculations 
+   # 3) 365 iterations per one-year time window is good enough
+
+   for my $day ( 1 .. $max_iter ) {
       return $tm->epoch if $self->_is_match($tm);
       $tm = $tm->plus_days(1);
    }
@@ -800,17 +850,6 @@ sub previous {
       my $lowval  = $node->lowest($tm);
       my $highval = $node->highest($tm);
 
-      my $tm_high = $self->_set_date( $tm, $node->field_type, $highval );
-      my $tm_low  = $self->_set_date( $tm, $node->field_type, $lowval );
-
-      if ( $tm->is_before($tm_low) || $node->type eq 'wildcard' ) {
-         $tm = $self->_set_date( $tm, $node->field_type, $highval );
-         $tm = $self->_minus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
-      }
-      elsif ( $tm->is_after($tm_high) ) {
-         $tm = $self->_set_date( $tm, $node->field_type, $highval );
-      }
-
       my $current_val = $self->_field_value( $tm, $node->field_type );
       for (my $c = $current_val; $c >= $lowval; $c--) {
          my $c_tm    = $self->_set_date( $tm, $node->field_type, $c );
@@ -819,8 +858,13 @@ sub previous {
             last NODE;
          }
       }
+
+      # flip odometer if no match
+      $tm = $self->_set_date( $tm, $node->field_type, $highval );
+      $tm = $self->_minus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
    }
 
+   # calculate maximum iterations
    my $min_tm = Time::Moment->new(
       year   => 1970,
       month  => 1,
@@ -831,6 +875,7 @@ sub previous {
    );
 
    my $min_iter = $min_tm->delta_days($tm);
+
    for my $day ( 0 .. $min_iter ) {
       return $tm->epoch if $self->_is_match($tm);
       $tm = $tm->minus_days(1);

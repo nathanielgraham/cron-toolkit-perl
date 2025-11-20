@@ -17,19 +17,18 @@ sub type {
 }
 
 sub match {
-   my ($self, $value, $tm) = @_;
-   #my ( $dow, $nth ) = $self->value =~ /(\d+)#(\d+)/;
-   my $target_dow  = $self->{dow};
-   my $actual_nth  = 0;
-   my $current_dom = $tm->day_of_month;
-   for ( my $d = 1 ; $d <= $current_dom ; $d++ ) {
-      my $test_tm = $tm->with_day_of_month($d);
-      if ( $test_tm->day_of_week == $target_dow ) {
-         $actual_nth++;
-      }
-   }
-   my $is_target = ( $tm->day_of_week == $target_dow );
-   return $is_target && $actual_nth == $self->{nth} ? 1 : 0;
+    my ($self, $value, $tm) = @_;
+    my $target_dow = $self->{dow};
+    my $nth        = $self->{nth};
+    my $dom        = $tm->day_of_month;
+
+    my $count = 0;
+    for my $d (1 .. $dom - 1) {
+        $count++ if $tm->with_day_of_month($d)->day_of_week == $target_dow;
+    }
+
+    return 0 unless $tm->day_of_week == $target_dow;
+    return $count + 1 == $nth;
 }
 
 sub to_english {

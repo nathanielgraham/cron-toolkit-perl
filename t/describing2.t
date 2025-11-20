@@ -42,6 +42,6 @@ for my $test (@valid_desc) {
 
     #print Dumper($cron->{fields});
     print $cron->as_string . "\n";
-    #print $cron->dump_tree . "\n\n";
+    print $cron->dump_tree('') . "\n\n";
     print $cron->describe . "\n\n";
 }

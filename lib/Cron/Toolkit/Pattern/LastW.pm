@@ -24,7 +24,7 @@ sub match {
 }
 
 sub to_english {
-   return 'on the last weekday of every month'
+   return 'on the last weekday';
 }
 
 1;

@@ -39,7 +39,7 @@ my @tests = (
         prev_tm => $base->minus_seconds(1),
     },
     {
-        expr => '* * 16-22 * * ? *',
+        expr => '* * 16-20 * * ? *',
         desc => 'every second',
         next_tm => $base->plus_seconds(1),
         prev_tm => $base->minus_seconds(1),
