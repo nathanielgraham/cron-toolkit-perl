@@ -14,6 +14,18 @@ diag "Base time: " . $base->strftime('%Y-%m-%d %H:%M:%S UTC') . " (epoch $base_e
 
 my @tests = (
     {
+        expr => '25-45 34 * 9 2 ? *',
+        desc => 'nth third',
+        next_tm => $base->plus_seconds(1),
+        prev_tm => $base->minus_seconds(1),
+    },
+    {
+        expr => '0 0 0 29 2 ? 2024',
+        desc => 'nth third',
+        next_tm => $base->plus_seconds(1),
+        prev_tm => $base->minus_seconds(1),
+    },
+    {
         expr => '0 0 0 ? * 3#3 *',
         desc => 'nth third',
         next_tm => $base->plus_seconds(1),

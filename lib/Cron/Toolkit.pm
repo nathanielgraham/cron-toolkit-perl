@@ -57,9 +57,9 @@ sub new {
    my @fields     = split /\s+/, $expr;
    my @raw_fields = @fields;
 
-   # normalize to 7-fields 
+   # normalize to 7-fields
    unshift( @fields, 0 ) if scalar @fields == 5;    # seconds
-   push( @fields, '*' ) if scalar @fields == 6;     # year
+   push( @fields, '*' )  if scalar @fields == 6;    # year
    die "expected 5-7 fields" unless scalar @fields == 7;
 
    # normalize to 7-field quartz expression
@@ -95,6 +95,7 @@ sub new {
    elsif ( $fields[3] eq '*' && $fields[5] ne '?' ) {
       $fields[3] = '?';
    }
+
    #elsif ( $fields[3] ne '?' && $fields[5] ne '?' ) {
    #   die "dow and dom cannot both be specified\n";
    #}
@@ -107,7 +108,7 @@ sub new {
    my $self = bless {
       fields      => \@fields,
       raw_fields  => \@raw_fields,
-      nodes => [],
+      nodes       => [],
       utc_offset  => 0,
       time_zone   => 'UTC',
       begin_epoch => time - ( 10 * 365 * 86400 ),    # ~10 years ago
@@ -129,15 +130,13 @@ sub _build_tree {
    for my $i ( 0 .. $#types ) {
       my $node = $self->_build_node( $types[$i], $self->{fields}[$i] );
       $node = $self->_optimize_node( $node, $types[$i] );
-      push (@{ $self->{nodes} }, $node);
+      push( @{ $self->{nodes} }, $node );
    }
-   $self->_finalize_dow($self->{nodes}[5]);
+   $self->_finalize_dow( $self->{nodes}[5] );
 }
 
 sub _optimize_node {
    my ( $self, $node, $field ) = @_;
-
-   print STDERR "DEBUG: Optimizing $field node: type=$node->{type}\n" if $ENV{Cron_DEBUG};
 
    # Get field limits
    my ( $min, $max ) = @{ $LIMITS{$field} };
@@ -171,14 +170,12 @@ sub _optimize_node {
 
       # === DEGENERATE CASE: 0 or 1 value → collapse ===
       if ( @stepped == 0 ) {
-         print STDERR "DEBUG: Step collapse to wildcard: $field\n" if $ENV{Cron_DEBUG};
          return Cron::Toolkit::Pattern::Wildcard->new(
             value      => '*',
             field_type => $field
          );
       }
       elsif ( @stepped == 1 ) {
-         print STDERR "DEBUG: Step collapse to single: $stepped[0] in $field\n" if $ENV{Cron_DEBUG};
          return Cron::Toolkit::Pattern::Single->new(
             value      => $stepped[0],
             field_type => $field
@@ -190,9 +187,7 @@ sub _optimize_node {
       my $optimized_base = $self->_optimize_node( $base_node, $field );
       return $node if $optimized_base == $base_node;    # no change
 
-      my $new_step = Cron::Toolkit::Pattern::Step->new(
-         field_type => $field
-      );
+      my $new_step = Cron::Toolkit::Pattern::Step->new( field_type => $field );
       $new_step->add_child($optimized_base);
       $new_step->add_child( $node->{children}[1] );     # step value
       return $new_step;
@@ -203,10 +198,7 @@ sub _optimize_node {
       my @values = sort { $a <=> $b } map { $_->{value} }
         grep { $_->type eq 'single' } @{ $node->{children} };
       if ( @values >= 2 && $values[-1] - $values[0] == $#values ) {
-         print STDERR "DEBUG: List collapse to range: $values[0]-$values[-1] in $field\n" if $ENV{Cron_DEBUG};
-         my $range = Cron::Toolkit::Pattern::Range->new(
-            field_type => $field
-         );
+         my $range = Cron::Toolkit::Pattern::Range->new( field_type => $field );
          $range->add_child(
             Cron::Toolkit::Pattern::Single->new(
                value      => $values[0],
@@ -230,7 +222,6 @@ sub _finalize_dow {
    my $self     = shift;
    my $dow_node = shift;
 
-   
    if ( $dow_node->has_children ) {
       $self->_finalize_dow($_) for @{ $dow_node->{children} };
    }
@@ -239,7 +230,6 @@ sub _finalize_dow {
       $dow_node->{value} = 7;
    }
 }
-
 
 sub _build_node {
    my ( $self, $field, $value ) = @_;
@@ -272,8 +262,8 @@ sub _build_node {
         unless $field =~ /^dom|dow$/;
 
       $node = Cron::Toolkit::Pattern::Last->new(
-         value => $value,
-         offset => 0,
+         value      => $value,
+         offset     => 0,
          field_type => $field,
       );
 
@@ -288,10 +278,10 @@ sub _build_node {
    }
    elsif ( $value =~ qr/^L-(\d+)$/ ) {
       my $offset = $1;
-      die "Syntax: L only allowed in dom, not $field" unless  $field eq 'dom';
+      die "Syntax: L only allowed in dom, not $field" unless $field eq 'dom';
 
       if ($offset) {
-         die "dom offset $offset too large" if $offset >= $max-1;
+         die "dom offset $offset too large" if $offset >= $max - 1;
       }
 
       $node = Cron::Toolkit::Pattern::Last->new(
@@ -320,7 +310,7 @@ sub _build_node {
    elsif ( $value =~ /^(\d+)#(\d+)$/ ) {
       die "Syntax: # only allowed in dow, not $field" unless $field eq 'dow';
       my ( $day, $nth ) = ( $1, $2 );
-      die "dow $day out of range [1-7]" unless $day >= 1 && $day <= 7; 
+      die "dow $day out of range [1-7]" unless $day >= 1 && $day <= 7;
       die "nth $nth out of range [1-5]" unless $nth >= 1 && $nth <= 5;
       $node = Cron::Toolkit::Pattern::Nth->new(
          value      => $value,
@@ -340,30 +330,20 @@ sub _build_node {
       my ( $start, $end ) = ( $1, $2 );
       die "$field start $start out of range [$min-$max]" unless $start >= $min && $start <= $max;
       die "$field end $end out of range [$min-$max]"     unless $end >= $min   && $end <= $max;
-      die "$field range start $start must be <= end $end" if $start > $end;
-      $node = Cron::Toolkit::Pattern::Range->new(
-         field_type => $field
-      );
-      $node->add_child(
-         Cron::Toolkit::Pattern::Single->new(
-            type       => 'single',
-            value      => $start,
-            field_type => $field
-         )
-      );
-      $node->add_child(
-         Cron::Toolkit::Pattern::Single->new(
-            type       => 'single',
-            value      => $end,
-            field_type => $field
-         )
-      );
+      die "$field range start $start must be <= end $end" if $start > $end && $field ne 'dow';
+
+      $node = Cron::Toolkit::Pattern::Range->new( field_type => $field );
+      $node->add_child( Cron::Toolkit::Pattern::Single->new( value => $start, field_type => $field ) );
+      $node->add_child( Cron::Toolkit::Pattern::Single->new( value => $end,   field_type => $field ) );
+
+      if ( $field eq 'dow' && $start > $end ) {
+         $node->{wrapped} = 1;
+      }
    }
    elsif ( $value =~ /^(\*|\d+)\/(\d+)$/ ) {
       my ( $base_str, $step ) = ( $1, $2 );
       die "$field step $step out of range [$min-$max]" unless $step >= $min && $step <= $max;
       die "$field base $base_str out of range [$min-$max]" if $base_str ne '*' && ( $base_str < $min || $base_str > $max );
-      print STDERR "DEBUG: Parsing step: base=$base_str, step=$step\n" if $ENV{Cron_DEBUG};
       $node = Cron::Toolkit::Pattern::Step->new(
          type       => 'step',
          field_type => $field
@@ -371,7 +351,7 @@ sub _build_node {
       my $base_node =
         $base_str eq '*'
         ? Cron::Toolkit::Pattern::Wildcard->new( type => 'wildcard', value => '*', field_type => $field )
-        : Cron::Toolkit::Pattern::Single->new( type => 'single',   value => $base_str, field_type => $field );
+        : Cron::Toolkit::Pattern::Single->new( type => 'single', value => $base_str, field_type => $field );
       $node->add_child($base_node);
       $node->add_child(
          Cron::Toolkit::Pattern::StepValue->new(
@@ -382,51 +362,38 @@ sub _build_node {
       );
    }
    elsif ( $value =~ /^(\*|\d+)-(\d+)\/(\d+)$/ ) {
-      my ( $start, $end, $step ) = ( $1, $2, $3 );
-      die "$field range start $start out of range [$min-$max]" if $start ne '*' && ( $start < $min || $start > $max );
-      die "$field range end $end out of range [$min-$max]" unless $end >= $min  && $end <= $max;
-      die "$field step $step out of range [$min-$max]"     unless $step >= $min && $step <= $max;
-      die "$field range start $start must be <= end $end" if $start ne '*' && $start > $end;
-      print STDERR "DEBUG: Parsing step range: start=$start, end=$end, step=$step\n" if $ENV{Cron_DEBUG};
-      my $range = Cron::Toolkit::Pattern::Range->new(
-         type       => 'range',
-         field_type => $field
+      my ( $base_str, $end, $step ) = ( $1, $2, $3 );
+      my $start = $base_str eq '*' ? $min : $base_str;
+
+      die "$field start $start out of range" unless $start >= $min && $start <= $max;
+      die "$field end $end out of range"     unless $end >= $min   && $end <= $max;
+      die "$field step $step invalid"        unless $step > 0;
+
+      my $wrapped = 0;
+      if ( $field eq 'dow' && $start > $end ) {
+         $wrapped = 1;
+      }
+      else {
+         die "$field range start $start must be <= end $end" if $start > $end && $field ne 'dow';
+      }
+
+      my $range_node = Cron::Toolkit::Pattern::Range->new(
+         field_type => $field,
+         wrapped    => $wrapped
       );
-      $range->add_child(
-         Cron::Toolkit::Pattern::Single->new(
-            type       => 'single',
-            value      => $start,
-            field_type => $field
-         )
-      );
-      $range->add_child(
-         Cron::Toolkit::Pattern::Single->new(
-            type       => 'single',
-            value      => $end,
-            field_type => $field
-         )
-      );
-      $node = Cron::Toolkit::Pattern::Step->new(
-         type       => 'step',
-         field_type => $field
-      );
-      $node->add_child($range);
-      $node->add_child(
-         Cron::Toolkit::Pattern::StepValue->new(
-            type       => 'step_value',
-            value      => $step,
-            field_type => $field
-         )
-      );
+      $range_node->add_child( Cron::Toolkit::Pattern::Single->new( value => $start, field_type => $field ) );
+      $range_node->add_child( Cron::Toolkit::Pattern::Single->new( value => $end,   field_type => $field ) );
+
+      $node = Cron::Toolkit::Pattern::Step->new( field_type => $field );
+      $node->add_child($range_node);
+      $node->add_child( Cron::Toolkit::Pattern::StepValue->new( value => $step, field_type => $field ) );
    }
    elsif ( $value =~ /,/ ) {
       $node = Cron::Toolkit::Pattern::List->new(
          type       => 'list',
          field_type => $field
       );
-      print STDERR "DEBUG: Parsing list: elements=[" . join( ',', split /,/, $value ) . "]\n" if $ENV{Cron_DEBUG};
       for my $sub ( split /,/, $value ) {
-         print STDERR "DEBUG: Parsing list element: $sub in $field\n" if $ENV{Cron_DEBUG};
          eval {
             my $sub_node = $self->_build_node( $field, $sub );
             die "Invalid list element in $field: list not allowed" if $sub_node->type eq 'list';
@@ -454,9 +421,7 @@ sub utc_offset {
          die "Invalid utc_offset '$new_offset': must be an integer between -1080 and 1080 minutes";
       }
       $self->{utc_offset} = $new_offset;
-      print STDERR "DEBUG: utc_offset: set to $new_offset\n" if $ENV{Cron_DEBUG};
    }
-   print STDERR "DEBUG: utc_offset: returning $self->{utc_offset}\n" if $ENV{Cron_DEBUG};
    return $self->{utc_offset};
 }
 
@@ -471,9 +436,7 @@ sub time_zone {
       $self->{time_zone} = $tz;
       my $tm = Time::Moment->now_utc;
       $self->{utc_offset} = $zone->offset_for_datetime($tm) / 60;    # Recalc to minutes (DST-aware)
-      print STDERR "DEBUG: time_zone: set to $tz (offset: $self->{utc_offset})\n" if $ENV{Cron_DEBUG};
    }
-   print STDERR "DEBUG: time_zone: returning $self->{time_zone}\n" if $ENV{Cron_DEBUG};
    return $self->{time_zone};
 }
 
@@ -521,21 +484,23 @@ sub as_unix_string {
 }
 
 sub as_quartz_string {
-   my $self   = shift;
-   my $expr   = $self->_as_string;
-   my @fields = split /\s+/, $expr;
+    my $self = shift;
+    my $expr = $self->_as_string;
+    my @fields = split /\s+/, $expr;
 
-   # Increment standalone DOW numbers: 0-6 → 1-7
-   # But NOT if preceded by /, #, - or followed by W
-   $fields[5] =~ s{
-        (?<![\\/#\-])   # not after /, #, -
-        \b([0-6])\b     # standalone 0–6
-        (?![W])         # not before W
+    return $expr unless @fields > 5;
+
+    my $dow = $fields[5];
+
+    $dow =~ s{
+       (?<![L#])        # not preceded by L or #
+       \b([1-7])\b      # standalone 1-7
     }{
-        $1 + 1
+       $1 == 7 ? 1 : $1 + 1
     }gex;
 
-   return join ' ', @fields;
+    $fields[5] = $dow;
+    return join ' ', @fields;
 }
 
 sub as_string {
@@ -544,8 +509,8 @@ sub as_string {
 }
 
 sub _as_string {
-   my $self = shift;
-   my $string = join (' ',  map { $self->_rebuild_from_node($_) } @{ $self->{nodes} });
+   my $self   = shift;
+   my $string = join( ' ', map { $self->_rebuild_from_node($_) } @{ $self->{nodes} } );
 }
 
 sub to_json {
@@ -560,6 +525,81 @@ sub to_json {
          end_epoch   => $self->end_epoch,
       }
    );
+}
+
+sub new_from_crontab2 {
+   my ( $class, $content ) = @_;
+   die "crontab content required (string)" unless defined $content && length $content;
+
+   my @crons;
+   my %env;
+
+   for my $orig_line ( split /\n/, $content ) {
+      my $line = $orig_line;
+      $line =~ s/\s*#.*$//;  # strip trailing comments
+      $line =~ s/^\s+|\s+$//g;  # trim
+      next unless $line;
+
+      # Env var
+      if ( $line =~ /^([A-Z_][A-Z0-9_]*)=(.*)$/ ) {
+         $env{$1} = $2;
+         next;
+      }
+
+      # Split, preserving quoted strings
+      my @parts = $line =~ /(".*?"|\S+)/g;
+
+      my @cron_parts;
+      my $is_alias = 0;
+      for my $i (0 .. $#parts) {
+         my $part = $parts[$i];
+
+         last if @cron_parts >= 7;
+
+         if (@cron_parts == 0 && $part =~ /^@/ ) {
+            push @cron_parts, $part;
+            $is_alias = 1;
+            last;
+         }
+
+         # Stop if looks like command (starts with / or --)
+         last if $part =~ m{^/} or $part =~ m{^--};
+
+         # Cron token? (digits, *, ?, -, /, ,, L, W, #, letters)
+         if ( $part =~ /^[0-9A-Za-z*,?\/\-#LW]+$/i ) {
+            push @cron_parts, $part;
+         } else {
+            last;  # start of command
+         }
+      }
+
+      my $expr = join ' ', @cron_parts;
+      next unless $is_alias or (@cron_parts >= 5 and @cron_parts <= 7);
+
+      # User field? Next token after cron parts if simple word
+      my $command_start = $is_alias ? 1 : @cron_parts;
+      my $user;
+      if (@parts > $command_start and $parts[$command_start] =~ /^\w+$/) {
+         $user = $parts[$command_start];
+         $command_start++;
+      }
+
+      # Command = rest, with quotes preserved
+      my $command = join ' ', @parts[$command_start .. $#parts];
+
+      eval {
+         my $cron = $class->new(
+            expression => $expr,
+            user       => $user,
+            command    => $command,
+            env        => {%env}
+         );
+         push @crons, $cron;
+      };
+      warn "Skipped invalid crontab line: '$orig_line' ($@)" if $@;
+   }
+
+   return @crons;
 }
 
 # new_from_crontab class method
@@ -584,6 +624,7 @@ sub new_from_crontab {
       my @parts = split /\s+/, $line;
 
       # Iterative token consumption for cron prefix
+
       my @cron_parts;
       my $is_alias = 0;
       for my $part (@parts) {
@@ -638,27 +679,27 @@ sub new_from_crontab {
 }
 
 sub dump_tree {
-    my ($self, $indent) = @_;
-    my $out;
+   my ( $self, $indent ) = @_;
+   my $out;
 
-    my @names = qw(second minute hour dom month dow year);
-    for my $i (0 .. $#{$self->{nodes}}) {
-        my $node = $self->{nodes}[$i];
-        my $name = $names[$i];
+   my @names = qw(second minute hour dom month dow year);
+   for my $i ( 0 .. $#{ $self->{nodes} } ) {
+      my $node = $self->{nodes}[$i];
+      my $name = $names[$i];
 
-        my $prefix = $i == 0 ? '┌─' : $i == $#{$self->{nodes}} ? '└─' : '├─';
-        my $child_indent = $i == $#{$self->{nodes}} ? '  ' : '│ ';
+      my $prefix       = $i == 0 ? '┌─' : $i == $#{ $self->{nodes} } ? '└─' : '├─';
+      my $child_indent = $i == $#{ $self->{nodes} } ? '  ' : '│ ';
 
-        $out .= "$prefix $name: " . $node->_dump_tree($child_indent) . "\n";
-    }
-    return $out;
+      $out .= "$prefix $name: " . $node->_dump_tree($child_indent) . "\n";
+   }
+   return $out;
 }
 
 sub _rebuild_from_node {
    my ( $self, $node ) = @_;
    my $type = $node->type;
-   return '*'            if $type eq 'wildcard';
-   return '?'            if $type eq 'unspecified';
+   return '*'          if $type eq 'wildcard';
+   return '?'          if $type eq 'unspecified';
    return $node->value if $type eq 'single' || $type eq 'last' || $type eq 'lastW' || $type eq 'nth' || $type eq 'nearest_weekday' || $type eq 'step_value';
    return $self->_rebuild_from_node( $node->{children}[0] ) . '-' . $self->_rebuild_from_node( $node->{children}[1] ) if $type eq 'range';
    return $self->_rebuild_from_node( $node->{children}[0] ) . '/' . $self->_rebuild_from_node( $node->{children}[1] ) if $type eq 'step';
@@ -674,50 +715,52 @@ sub describe {
    my $dmy = '';
    my @nodes;
 
-   my $wildcards = scalar grep { $_->type  eq 'wildcard' } @{ $self->{nodes} }[0..2];
-   my $singles = scalar grep { $_->type  eq 'single' } @{ $self->{nodes} }[0..2];
+   my $wildcards = scalar grep { $_->type eq 'wildcard' } @{ $self->{nodes} }[ 0 .. 2 ];
+   my $singles   = scalar grep { $_->type eq 'single' } @{ $self->{nodes} }[ 0 .. 2 ];
 
    # dedupe wildcards
    my $prev_type = '';
-   for my $node (@{ $self->{nodes} }) {
+   for my $node ( @{ $self->{nodes} } ) {
       push @nodes, $node->type eq 'wildcard' && $prev_type eq 'wildcard' ? undef : $node;
       $prev_type = $node->type;
    }
 
    # HMS
    if ( $wildcards == 3 ) {
-      $hms = $nodes[0]->to_english;   
+      $hms = $nodes[0]->to_english;
    }
    elsif ( $singles == 3 ) {
-      $hms = format_time(map { $_->value } @nodes[0..2]);
+      $hms = format_time( map { $_->value } @nodes[ 0 .. 2 ] );
    }
    else {
-      $hms = join(' of ', map { $_->to_english } grep { defined $_ && !($_->type eq 'single' && $_->value == 0) } @nodes[0..2]);
+      $hms = join( ' of ', map { $_->to_english } grep { defined $_ && !( $_->type eq 'single' && $_->value == 0 ) } @nodes[ 0 .. 2 ] );
    }
 
    # DMY
-   if (defined $nodes[3] && $nodes[3]->type ne 'unspecified') {
-      if ($nodes[3]->type eq 'single') {
+   if ( defined $nodes[3] && $nodes[3]->type ne 'unspecified' ) {
+      if ( $nodes[3]->type eq 'single' ) {
          $dmy = 'on ' . $nodes[3]->to_english;
       }
       else {
          $dmy = $nodes[3]->to_english;
       }
+
       #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[3]->type eq 'wildcard';
       $dmy .= ' of ' . $self->{nodes}[4]->to_english;
    }
 
-   if (defined $nodes[3] && $nodes[3]->type ne 'unspecified' && defined $nodes[5] && $nodes[5]->type ne 'unspecified') {
+   if ( defined $nodes[3] && $nodes[3]->type ne 'unspecified' && defined $nodes[5] && $nodes[5]->type ne 'unspecified' ) {
       $dmy .= ' and ';
    }
 
-   if (defined $nodes[5] && $nodes[5]->type ne 'unspecified') {
-      if ($nodes[5]->type =~ /^single|list$/) {
+   if ( defined $nodes[5] && $nodes[5]->type ne 'unspecified' ) {
+      if ( $nodes[5]->type =~ /^single|list$/ ) {
          $dmy .= 'every ' . $nodes[5]->to_english;
-         $dmy .= ' in ' . $self->{nodes}[4]->to_english
+         $dmy .= ' in ' . $self->{nodes}[4]->to_english;
       }
       else {
          $dmy .= $nodes[5]->to_english;
+
          #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[5]->type eq 'wildcard';
          $dmy .= ' of ' . $self->{nodes}[4]->to_english;
       }
@@ -741,15 +784,15 @@ sub is_match {
 sub _is_match {
    my ( $self, $tm ) = @_;
 
-   NODE: for my $node ( @{ $self->{nodes} } ) {
-      my $value   = $self->_field_value( $tm, $node->field_type );
-      if ($node->type eq 'list') {
-         for my $child (@{ $node->children }) {
-            next NODE if $child->match($value, $tm);
+ NODE: for my $node ( @{ $self->{nodes} } ) {
+      my $value = $self->_field_value( $tm, $node->field_type );
+      if ( $node->type eq 'list' ) {
+         for my $child ( @{ $node->children } ) {
+            next NODE if $child->match( $value, $tm );
          }
          return 0;
       }
-      return 0 unless $node->match($value, $tm);
+      return 0 unless $node->match( $value, $tm );
    }
    return 1;
 }
@@ -765,36 +808,21 @@ sub next {
    my $tm = Time::Moment->from_epoch($clamped)->with_offset_same_instant( $self->{utc_offset} );
    $tm = $tm->plus_seconds(1);
 
-   # set year 
-   my $year_node = $self->{nodes}[6];
-   my $year_lowval = $year_node->lowest($tm) - 1;
-   my $tm_year_low = $self->_set_date( $tm, $year_node->field_type, $year_lowval );
-   $tm = $tm_year_low if $tm->is_before($tm_year_low);
-
-   # shortcut for HMS 
+   # shortcut for HMS
    NODE: foreach my $i ( 0 .. 2 ) {
-      my $node = $self->{nodes}[$i];
+      my $node    = $self->{nodes}[$i];
+      my $curval  = $self->_field_value( $tm, $node->field_type );
       my $lowval  = $node->lowest($tm);
       my $highval = $node->highest($tm);
 
-      #if ($curval >= $highval) {
-      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
-      #   $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
-      #}
-      #elsif ($node->type eq 'wildcard') {
-      #   $tm = $self->_plus_one( $tm, $node->field_type );
-      #}
+      if ($curval >= $highval) {
+         $tm = $self->_set_date( $tm, $node->field_type, $lowval );
+         $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
+         next NODE;
+      }
 
-      #if ( $tm->is_before($tm_low) ) {
-      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
-      #}
-      #elsif ( $tm->is_after($tm_high) || $node->type eq 'wildcard' ) {
-      #   $tm = $self->_set_date( $tm, $node->field_type, $lowval );
-      #   $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
-      #}
-
-      for my $c ( $self->_field_value( $tm, $node->field_type ) .. $highval ) {
-         my $c_tm    = $self->_set_date( $tm, $node->field_type, $c );
+      for my $c ( $curval .. $highval ) {
+         my $c_tm = $self->_set_date( $tm, $node->field_type, $c );
          if ( $self->_is_match($c_tm) ) {
             $tm = $c_tm;
             last NODE;
@@ -805,6 +833,12 @@ sub next {
       $tm = $self->_set_date( $tm, $node->field_type, $lowval );
       $tm = $self->_plus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
    }
+
+   # set year
+   my $year_node   = $self->{nodes}[6];
+   my $year_lowval = $year_node->lowest($tm);
+   my $tm_year_low = $self->_set_date( $tm, $year_node->field_type, $year_lowval );
+   $tm = $tm_year_low if $tm->is_before($tm_year_low);
 
    my $max_tm = Time::Moment->new(
       year   => 2099,
@@ -817,16 +851,16 @@ sub next {
 
    my $max_iter = $tm->delta_days($max_tm);
 
-   # the brute force approach for DMY is slightly  
-   # inneficient but the upsides make the trade-off worth it:  
-   # 1) a simple design that is easy to understand and debug
-   # 2) solves all tricky end-of-month and leap year calculations 
+   # the brute force approach for DMY is correct here because:
+   # 1) the design is simple and easy to understand and debug
+   # 2) solves all tricky end-of-month and leap year calculations
    # 3) 365 iterations per one-year time window is good enough
 
    for my $day ( 1 .. $max_iter ) {
       return $tm->epoch if $self->_is_match($tm);
       $tm = $tm->plus_days(1);
    }
+   return;
 }
 
 sub previous {
@@ -839,20 +873,22 @@ sub previous {
 
    my $tm = Time::Moment->from_epoch($clamped)->with_offset_same_instant( $self->{utc_offset} );
    $tm = $tm->minus_seconds(1);
-   my $year_node = $self->{nodes}[6];
-   my $year_highval = $year_node->highest($tm) + 1;
-   my $tm_year_high = $self->_set_date( $tm, $year_node->field_type, $year_highval );
-   $tm = $tm_year_high if $tm->is_after($tm_year_high);
 
    NODE: foreach my $i ( 0 .. 2 ) {
       my $node = $self->{nodes}[$i];
 
       my $lowval  = $node->lowest($tm);
       my $highval = $node->highest($tm);
+      my $curval  = $self->_field_value( $tm, $node->field_type );
 
-      my $current_val = $self->_field_value( $tm, $node->field_type );
-      for (my $c = $current_val; $c >= $lowval; $c--) {
-         my $c_tm    = $self->_set_date( $tm, $node->field_type, $c );
+      if ($curval <= $lowval) {
+         $tm = $self->_set_date( $tm, $node->field_type, $highval );
+         $tm = $self->_minus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
+         next NODE;
+      }
+
+      for ( my $c = $curval ; $c >= $lowval ; $c-- ) {
+         my $c_tm = $self->_set_date( $tm, $node->field_type, $c );
          if ( $self->_is_match($c_tm) ) {
             $tm = $c_tm;
             last NODE;
@@ -863,6 +899,12 @@ sub previous {
       $tm = $self->_set_date( $tm, $node->field_type, $highval );
       $tm = $self->_minus_one( $tm, $self->{nodes}[ $i + 1 ]->field_type );
    }
+
+   # set year
+   my $year_node    = $self->{nodes}[6];
+   my $year_highval = $year_node->highest($tm);
+   my $tm_year_high = $self->_set_date( $tm, $year_node->field_type, $year_highval );
+   $tm = $tm_year_high if $tm->is_after($tm_year_high);
 
    # calculate maximum iterations
    my $min_tm = Time::Moment->new(
@@ -880,6 +922,7 @@ sub previous {
       return $tm->epoch if $self->_is_match($tm);
       $tm = $tm->minus_days(1);
    }
+   return;
 }
 
 sub _field_value {
