@@ -70,32 +70,3 @@ sub to_english {
 }
 
 1;
-
-__END__
-
-sub new {
-    my ($class, %args) = @_;
-    my $self = $class->SUPER::new(%args);
-    $self->{offset} = $args{offset} if defined $args{offset};
-    return $self;
-}
-
-sub type {
-   return 'last';
-}
-
-sub match {
-    my ($self, $value, $tm) = @_;
-    my $target = $tm->length_of_month - ($self->{offset} // 0);
-    return $tm->day_of_month == $target;
-}
-
-sub to_english {
-   my ($self) = @_;
-   use Data::Dumper;
-   print Dumper($self);
-   return "on the last day" unless $self->{offset};
-   return "on the " . num_to_ordinal($self->{offset}) . " to last day";
-}
-
-1;

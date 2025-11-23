@@ -5,7 +5,6 @@
 ^Build$
 ^MYMETA\.
 ^cover_db
-prototype-tree
 share\.sh
 grok_prompts
 Makefile
