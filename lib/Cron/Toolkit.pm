@@ -5,6 +5,7 @@ $VERSION = 0.08;
 use strict;
 use warnings;
 use Time::Moment;
+use DateTime::TimeZone;
 use Cron::Toolkit::Utils qw(:all);
 use Cron::Toolkit::Pattern::Single;
 use Cron::Toolkit::Pattern::Wildcard;
@@ -415,24 +416,21 @@ sub _build_node {
 }
 
 sub utc_offset {
-   my ( $self, $new_offset ) = @_;
-   if ( @_ > 1 ) {
-      if ( !defined $new_offset || $new_offset !~ /^-?\d+$/ || $new_offset < -1080 || $new_offset > 1080 ) {
-         die "Invalid utc_offset '$new_offset': must be an integer between -1080 and 1080 minutes";
+   my ( $self, $offset ) = @_;
+   if ( $offset ) {
+      if ( $offset !~ /^-?\d+$/ || $offset < -1080 || $offset > 1080 ) {
+         die "Invalid utc_offset '$offset': must be an integer between -1080 and 1080 minutes";
       }
-      $self->{utc_offset} = $new_offset;
+      $self->{utc_offset} = $offset;
    }
    return $self->{utc_offset};
 }
 
 sub time_zone {
-   my ( $self, $new_tz ) = @_;
-   if ( @_ > 1 ) {
-      require DateTime::TimeZone;
-      my $tz   = $new_tz;
-      my $zone = eval { DateTime::TimeZone->new( name => $tz ); } or do {
-         die "Invalid time_zone '$tz': must be a valid TZ identifier ($@)";
-      };
+   my ( $self, $tz ) = @_;
+   if ( $tz ) {
+      my $zone = eval { DateTime::TimeZone->new( name => $tz ) };
+      die "Invalid time_zone '$tz': must be a valid TZ identifier ($@)" if $@;
       $self->{time_zone} = $tz;
       my $tm = Time::Moment->now_utc;
       $self->{utc_offset} = $zone->offset_for_datetime($tm) / 60;    # Recalc to minutes (DST-aware)
@@ -459,17 +457,20 @@ sub end_epoch {
 }
 
 sub user {
-   my ($self) = @_;
+   my ($self, $user) = @_;
+   $self->{user} = $user if $user;
    return $self->{user};
 }
 
 sub command {
-   my ($self) = @_;
+   my ($self, $command) = @_;
+   $self->{command} = $command if $command;
    return $self->{command};
 }
 
 sub env {
-   my ($self) = @_;
+   my ($self, $env) = @_;
+   $self->{env} = $env if $env;
    return $self->{env};
 }
 
@@ -527,82 +528,6 @@ sub to_json {
    );
 }
 
-sub new_from_crontab2 {
-   my ( $class, $content ) = @_;
-   die "crontab content required (string)" unless defined $content && length $content;
-
-   my @crons;
-   my %env;
-
-   for my $orig_line ( split /\n/, $content ) {
-      my $line = $orig_line;
-      $line =~ s/\s*#.*$//;  # strip trailing comments
-      $line =~ s/^\s+|\s+$//g;  # trim
-      next unless $line;
-
-      # Env var
-      if ( $line =~ /^([A-Z_][A-Z0-9_]*)=(.*)$/ ) {
-         $env{$1} = $2;
-         next;
-      }
-
-      # Split, preserving quoted strings
-      my @parts = $line =~ /(".*?"|\S+)/g;
-
-      my @cron_parts;
-      my $is_alias = 0;
-      for my $i (0 .. $#parts) {
-         my $part = $parts[$i];
-
-         last if @cron_parts >= 7;
-
-         if (@cron_parts == 0 && $part =~ /^@/ ) {
-            push @cron_parts, $part;
-            $is_alias = 1;
-            last;
-         }
-
-         # Stop if looks like command (starts with / or --)
-         last if $part =~ m{^/} or $part =~ m{^--};
-
-         # Cron token? (digits, *, ?, -, /, ,, L, W, #, letters)
-         if ( $part =~ /^[0-9A-Za-z*,?\/\-#LW]+$/i ) {
-            push @cron_parts, $part;
-         } else {
-            last;  # start of command
-         }
-      }
-
-      my $expr = join ' ', @cron_parts;
-      next unless $is_alias or (@cron_parts >= 5 and @cron_parts <= 7);
-
-      # User field? Next token after cron parts if simple word
-      my $command_start = $is_alias ? 1 : @cron_parts;
-      my $user;
-      if (@parts > $command_start and $parts[$command_start] =~ /^\w+$/) {
-         $user = $parts[$command_start];
-         $command_start++;
-      }
-
-      # Command = rest, with quotes preserved
-      my $command = join ' ', @parts[$command_start .. $#parts];
-
-      eval {
-         my $cron = $class->new(
-            expression => $expr,
-            user       => $user,
-            command    => $command,
-            env        => {%env}
-         );
-         push @crons, $cron;
-      };
-      warn "Skipped invalid crontab line: '$orig_line' ($@)" if $@;
-   }
-
-   return @crons;
-}
-
-# new_from_crontab class method
 sub new_from_crontab {
    my ( $class, $content ) = @_;
    die "crontab content required (string)" unless defined $content && length $content;
@@ -614,16 +539,17 @@ sub new_from_crontab {
       $line             =~ s/\s*#.*$//;       # Remove comments from end
       $line             =~ s/^\s+|\s+$//g;    # Trim whitespace
       next unless $line =~ /\S/;              # Skip empty
-                                              # Env var: KEY=VALUE (simple; no quotes handled yet)
+
       if ( $line =~ /^([A-Z_][A-Z0-9_]*)=(.*)$/ ) {
          $env{$1} = $2;
          next;
       }
 
-      # Split into tokens (simple space split; preserves quoted if manual, but for robustness, assume no embedded quotes in fields)
-      my @parts = split /\s+/, $line;
+      while ( my ( $var, $val ) = each %env ) {
+         $line =~ s/\$$var\b/$val/g;
+      }
 
-      # Iterative token consumption for cron prefix
+      my @parts = split /\s+/, $line;
 
       my @cron_parts;
       my $is_alias = 0;
@@ -636,7 +562,7 @@ sub new_from_crontab {
             $is_alias = 1;
             last;                     # Aliases are single
          }
-         elsif ( $part =~ /^[0-9*?,\/\-L#W?]+$/ ) {    # Cron-like: digits, *, ?, -, /, ,, L, W, #
+         elsif ( $part =~ /^[0-9*?,\/\-L#W?]+$/ || scalar (grep { $part =~ /$_/ } keys %DOW_MAP_UNIX) || scalar (grep { $part =~ /$_/ } keys %MONTH_MAP) ) {    # Cron-like: digits, *, ?, -, /, ,, L, W, #
             push @cron_parts, $part;
          }
          else {
@@ -649,8 +575,8 @@ sub new_from_crontab {
       next unless $is_alias || ( @cron_parts >= 5 && @cron_parts <= 7 );
 
       # Extract user: Next token after prefix, if simple word (alphanumeric, no / or special)
-      my ( $user, $command ) = ( undef, undef );
-      my $cron_end   = @cron_parts;
+      my ($user, $command);
+      my $cron_end   = scalar @cron_parts;
       my $next_start = $cron_end;
       if ( @parts > $cron_end ) {
          my $potential_user = $parts[$cron_end];
@@ -660,20 +586,23 @@ sub new_from_crontab {
          }
       }
 
-      # Command: Remainder (join from next_start, preserving original spacing if needed; here simple join)
       $command = join ' ', @parts[ $next_start .. $#parts ] if @parts > $next_start;
 
-      # Create object (new() auto-handles Unix/Quartz/ALIASES)
+      my $cron;
       eval {
-         my $cron = $class->new(
+         $cron = $class->new(
             expression => $expr,
             user       => $user,
             command    => $command,
             env        => {%env}      # Copy current env
          );
-         push @crons, $cron;
       };
-      warn "Skipped invalid crontab line: '$line' ($@)" if $@;
+      if ($@) {
+         warn "Skipped invalid crontab line: '$line' ($@)";
+      } 
+      else {
+         push @crons, $cron;
+      }
    }
    return @crons;
 }
