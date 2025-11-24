@@ -60,15 +60,15 @@ If it parses, the result is correct.
 
 - DOM + DOW = AND logic
 
-        Allows queries such as "next February 29 that falls on a Monday".
+    Allows queries such as "next February 29 that falls on a Monday".
 
 - Wrapped day-of-week ranges
 
-        C<6-2> → Saturday, Sunday, Monday, Tuesday
+    `6-2` Saturday, Sunday, Monday, Tuesday
 
 - Internal day-of-week: 1–7 = Monday–Sunday
 
-        Matches L<Time::Moment> and L<DateTime>. C<as_quartz_string()> converts back to Quartz's 1=Sunday convention.
+    Matches [Time::Moment](https://metacpan.org/pod/Time%3A%3AMoment) and [DateTime](https://metacpan.org/pod/DateTime). `as_quartz_string()` converts back to Quartz's 1=Sunday convention.
 
 # FIELD REFERENCE & ALLOWED VALUES
 
