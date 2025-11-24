@@ -122,7 +122,7 @@ Matches L<Time::Moment> and L<DateTime>. C<as_quartz_string()> converts back to 
     Hour             0–23                   *,/,-,
     Day of month     1–31                   *,/,-,?,L,LW,W
     Month            1–12 or JAN–DEC        *,/,-                          
-    Day of week      1–7 or SUN–SAT         *,/,-,?,L,#
+    Day of week      1–7 or MON-SUN         *,/,-,?,L,#
     Year (optional)  1970–2099              *,/,-
 
     Legend:
@@ -320,17 +320,13 @@ sub new {
    # Convert month names to numerical equivalent
    while ( my ( $name, $num ) = each %MONTH_MAP ) { $fields[4] =~ s/\b\Q$name\E\b/$num/gi; }
 
-   # enforce dom/dow mutual exclusivity
+   # align dom and dow fields
    if ( $fields[3] ne '?' && $fields[5] eq '*' ) {
       $fields[5] = '?';
    }
    elsif ( $fields[3] eq '*' && $fields[5] ne '?' ) {
       $fields[3] = '?';
    }
-
-   #elsif ( $fields[3] ne '?' && $fields[5] ne '?' ) {
-   #   die "dow and dom cannot both be specified\n";
-   #}
    elsif ( $fields[3] eq '?' && $fields[5] eq '?' ) {
       die "dow and dom cannot both be unspecified\n";
    }
@@ -347,6 +343,8 @@ sub new {
       end_epoch   => time + ( 10 * 365 * 86400 ),    # ~10 years ahead
    }, $class;
 
+   $self->utc_offset( $args{utc_offset} ) if defined $args{utc_offset};
+   $self->time_zone( $args{time_zone} ) if defined $args{time_zone};
    $self->user( $args{user} )       if defined $args{user};
    $self->command( $args{command} ) if defined $args{command};
    $self->env( $args{env} )         if defined $args{env};

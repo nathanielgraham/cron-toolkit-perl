@@ -79,7 +79,7 @@ If it parses, the result is correct.
     Hour             0–23                   *,/,-,
     Day of month     1–31                   *,/,-,?,L,LW,W
     Month            1–12 or JAN–DEC        *,/,-                          
-    Day of week      1–7 or SUN–SAT         *,/,-,?,L,#
+    Day of week      1–7 or MON-SUN         *,/,-,?,L,#
     Year (optional)  1970–2099              *,/,-
 
     Legend:
