@@ -1,7 +1,7 @@
 package Cron::Toolkit;
 
 # VERSION
-$VERSION = 0.08;
+$VERSION = 0.10;
 
 use strict;
 use warnings;
@@ -101,15 +101,15 @@ If it parses, the result is correct.
 
 =item * DOM + DOW = AND logic
 
-    Allows queries such as "next February 29 that falls on a Monday".
+Allows queries such as "next February 29 that falls on a Monday".
 
 =item * Wrapped day-of-week ranges
 
-    C<6-2> → Saturday, Sunday, Monday, Tuesday
+C<6-2> Saturday, Sunday, Monday, Tuesday
 
 =item * Internal day-of-week: 1–7 = Monday–Sunday
 
-    Matches L<Time::Moment> and L<DateTime>. C<as_quartz_string()> converts back to Quartz's 1=Sunday convention.
+Matches L<Time::Moment> and L<DateTime>. C<as_quartz_string()> converts back to Quartz's 1=Sunday convention.
 
 =back
 
