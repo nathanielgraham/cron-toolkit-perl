@@ -64,7 +64,7 @@ If it parses, the result is correct.
 
 - Wrapped day-of-week ranges
 
-    `6-2` Saturday, Sunday, Monday, Tuesday
+    6-2 matches Saturday, Sunday, Monday, Tuesday
 
 - Internal day-of-week: 1–7 = Monday–Sunday
 
