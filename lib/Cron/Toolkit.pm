@@ -105,7 +105,7 @@ Allows queries such as "next February 29 that falls on a Monday".
 
 =item * Wrapped day-of-week ranges
 
-C<6-2> Saturday, Sunday, Monday, Tuesday
+6-2 matches Saturday, Sunday, Monday, Tuesday
 
 =item * Internal day-of-week: 1–7 = Monday–Sunday
 
