@@ -1,7 +1,7 @@
 package Cron::Toolkit;
 
 # VERSION
-$VERSION = 0.10;
+$VERSION = 0.12;
 
 use strict;
 use warnings;
@@ -504,6 +504,7 @@ sub _build_node {
          $day //= $max;
          die "dow $day out of range [$min-$max]" unless $day >= $min && $day <= $max;
          $node->{dow} = $day;
+         $node->{value} = $day . 'L';
       }
    }
    elsif ( $value =~ qr/^L-(\d+)$/ ) {
@@ -556,8 +557,9 @@ sub _build_node {
          field_type => $field
       );
    }
-   elsif ( $value =~ /^(\d+)-(\d+)$/ ) {
+   elsif ( $value =~ /^(\*|\d+)-(\d+)$/ ) {
       my ( $start, $end ) = ( $1, $2 );
+      $start = $min if $start eq '*';
       die "$field start $start out of range [$min-$max]" unless $start >= $min && $start <= $max;
       die "$field end $end out of range [$min-$max]"     unless $end >= $min   && $end <= $max;
       die "$field range start $start must be <= end $end" if $start > $end && $field ne 'dow';
@@ -897,14 +899,9 @@ sub describe {
    # DMY
    if ( defined $nodes[3] && $nodes[3]->type ne 'unspecified' ) {
       if ( $nodes[3]->type eq 'single' ) {
-         $dmy = 'on ' . $nodes[3]->to_english;
+         $dmy .= 'on ';
       }
-      else {
-         $dmy = $nodes[3]->to_english;
-      }
-
-      #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[3]->type eq 'wildcard';
-      $dmy .= ' of ' . $self->{nodes}[4]->to_english;
+      $dmy .= $nodes[3]->to_english . ' of ' . $self->{nodes}[4]->to_english;
    }
 
    if ( defined $nodes[3] && $nodes[3]->type ne 'unspecified' && defined $nodes[5] && $nodes[5]->type ne 'unspecified' ) {
@@ -912,22 +909,17 @@ sub describe {
    }
 
    if ( defined $nodes[5] && $nodes[5]->type ne 'unspecified' ) {
-      if ( $nodes[5]->type =~ /^single|list$/ ) {
-         $dmy .= 'every ' . $nodes[5]->to_english;
-         $dmy .= ' in ' . $self->{nodes}[4]->to_english;
-      }
-      else {
-         $dmy .= $nodes[5]->to_english;
 
-         #$dmy .= ' of ' . $self->{nodes}[4]->to_english unless $nodes[5]->type eq 'wildcard';
-         $dmy .= ' of ' . $self->{nodes}[4]->to_english;
+      if ( $nodes[5]->type eq 'single' ) {
+         $dmy .= 'every ';
       }
+      $dmy .= $nodes[5]->to_english . ' of ' . $self->{nodes}[4]->to_english;
    }
 
    if ( defined $nodes[6] && $nodes[6]->type ne 'wildcard' ) {
       $dmy .= ' ' . $self->{nodes}[6]->to_english;
    }
-   return "$hms $dmy";
+   return join ' ', grep { $_ } ($hms, $dmy);
 }
 
 # matching
