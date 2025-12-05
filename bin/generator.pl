@@ -42,6 +42,7 @@ my @raw_exprs = (
     '0 0 0 * * * 2025',        # specific year
 
     # Step patterns (*/n) in every field
+    '* * * * 2/5 * *',
     '*/15 * * * * * *',
     '0 */5 * * * * *',
     '0 0 */3 * * * *',

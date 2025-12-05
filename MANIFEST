@@ -1,6 +1,5 @@
 Changes
 CONTRIBUTING.md
-j.pl
 lib/Cron/Toolkit.pm
 lib/Cron/Toolkit/Pattern.pm
 lib/Cron/Toolkit/Pattern/Last.pm
