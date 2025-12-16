@@ -105,6 +105,7 @@ my @raw_exprs = (
     '0 0 9 ? * MON-FRI *',           # 9 AM weekdays
     '0 0 12 ? * 5-1 *',              # noon on weekends
     '0 0 0 ? * 1#1,L *',             # 1st Monday AND last day
+    '0 3 4 2 3-7 ? 2028',
 
     # Aliases
     '@daily',
