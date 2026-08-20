@@ -195,7 +195,7 @@ my @raw_exprs = (
 my @data;
 
 for my $expr (@raw_exprs) {
-   my ( $tz, $offset_min ) = ( undef, 0 );
+   my ( $tz, $offset_min ) = ( undef, undef );
    my $rand = rand();
 
    if ( $rand > 0.25 ) {
@@ -217,32 +217,47 @@ for my $expr (@raw_exprs) {
       my $as_quartz_string = $cron->as_quartz_string;
       my $desc             = $cron->describe;
 
-      $cron->time_zone($tz)          if $tz;
-      $cron->utc_offset($offset_min) if $offset_min && !$tz;
+      # Apply exactly one of timezone or fixed offset — never both.
+      if ( defined $tz ) {
+         $cron->time_zone($tz);
+      }
+      elsif ( defined $offset_min ) {
+         $cron->utc_offset($offset_min);
+      }
 
-      my $actual_offset = $cron->utc_offset // 0;
-      my $base_epoch    = $BASE->epoch;
+      my $base_epoch = $BASE->epoch;
 
       my $is_match   = $cron->is_match($base_epoch);
       my $next_epoch = $cron->next($base_epoch);
       my $prev_epoch = $cron->previous($base_epoch);
 
-      push @data,
-        {
+      my %case = (
          category         => "general",
          expr             => $expr,
          as_string        => $as_string,
          as_unix_string   => $as_unix_string,
          as_quartz_string => $as_quartz_string,
          type             => ( $expr =~ /^@/ ) ? "alias" : ( ( split /\s+/, $expr ) == 5 && $expr !~ /\?/ ) ? "unix" : "quartz",
-         tz               => $tz,
-         utc_offset       => $actual_offset,
          invalid          => 0,
          desc             => $desc,
          base_epoch       => $base_epoch,
          next_epoch       => $next_epoch,
          prev_epoch       => $prev_epoch,
-        };
+      );
+
+      # Emit only one of tz / utc_offset
+      if ( defined $tz ) {
+         $case{tz} = $tz;
+      }
+      elsif ( defined $offset_min ) {
+         $case{utc_offset} = 0 + $offset_min;  # ensure numeric
+      }
+      else {
+         # neither chosen → record explicit UTC offset 0 for clarity
+         $case{utc_offset} = 0;
+      }
+
+      push @data, \%case;
    } or do {
       my $err = $@;
       $err =~ s/\s+at\s+.*$//s;
